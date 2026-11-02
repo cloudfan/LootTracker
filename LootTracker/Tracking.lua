@@ -1,0 +1,772 @@
+local addonName, ns = ...
+local API = ns.API
+
+-- Loot Tracker: what you loot and from what. No combat log: a kill is a
+-- corpse you looted. When the loot window opens, each slot's sources
+-- (GetLootSourceInfo: a GUID and a quantity, the copper for money) say what
+-- it came from:
+--   Creature   a kill; after a Skinning cast, its skinning loot; after a
+--              Pick Pocket cast, its pickpocketing loot
+--   GameObject a resource node (the gathering casts, or a node ID below), or
+--              a chest; while IsFishingLoot(), fishing (a fishing school
+--              when it is not the bobber)
+--   Item       a lockbox or other container you opened from your bags
+-- Each loot is kept as an event (the newest LOG_LIMIT, for the
+-- Individualized view) and added into totals by source, so nothing is lost
+-- when old events go. Totals are kept fine-grained (kind, ID, zone, school);
+-- the view merges them as the settings say. Per character, in
+-- LootTrackerDB.
+
+local S = "lootTracker"
+local LOG_LIMIT = 300
+local CAST_WINDOW = 4      -- seconds a gathering, skinning or opening cast counts for
+local TOOLTIP_WINDOW = 10  -- seconds a world object's tooltip name counts for (an opening cast takes up to 5)
+local BOBBERS = { [35591] = true } -- the fishing bobber
+
+-- Resource nodes that share a name across IDs, by the owner's choice.
+local NODE_GROUPS = {
+	[1731] = "Copper Vein", [2055] = "Copper Vein", [3763] = "Copper Vein", [103713] = "Copper Vein",
+	[562111] = "Copper Vein", -- Poor Copper Vein
+	[1618] = "Peacebloom", [3724] = "Peacebloom", [657382] = "Peacebloom", [657456] = "Peacebloom",
+	[656160] = "Peacebloom", [657454] = "Peacebloom", -- Wilted Peacebloom
+}
+ns.NODE_GROUPS = NODE_GROUPS
+
+local function Setting(key)
+	return API.Get(S, key)
+end
+
+local db -- LootTrackerDB, once loaded
+
+local function Changed()
+	API.Fire("LootTrackerChanged")
+end
+
+-- Names ------------------------------------------------------------------------------
+-- Creatures' names by GUID (target, mouseover, nameplates) and by NPC ID
+-- (kept); world objects' names from the tooltip shown just before a loot.
+
+local guidNames = {}
+local lastObject -- { name, time }
+
+local function Plain(value)
+	if value == nil or API.IsSecret(value) then
+		return nil
+	end
+	return value
+end
+
+local function GuidParts(guid)
+	local kind, _, _, _, _, id = strsplit("-", guid)
+	return kind, tonumber(id)
+end
+
+-- The name database, account-wide (LootTrackerNames): every NPC
+-- ID's name once learned, on any character; where each was looted inside an
+-- instance; and the IDs still waiting for a name (kept across sessions, so a
+-- name secret in an instance is filled in later, on any character). Names.lua
+-- ships a fallback list (ns.KNOWN_NAMES) for IDs never learned here.
+local nameDB
+
+local function InstanceName()
+	if IsInInstance and IsInInstance() then
+		return Plain((GetInstanceInfo())) or "Instance"
+	end
+end
+
+local function KnownName(id)
+	if type(id) ~= "number" then
+		return nil
+	end
+	return (nameDB and nameDB.names[id]) or (ns.KNOWN_NAMES and ns.KNOWN_NAMES[id])
+end
+
+local function Remember(id, name)
+	if not (nameDB and type(id) == "number" and name) then
+		return
+	end
+	nameDB.names[id] = name
+	local instance = InstanceName()
+	if instance then
+		nameDB.instanced[id] = instance
+	end
+	nameDB.pending[id] = nil
+end
+
+-- World objects (chests, containers, nodes, schools, other spawns) have no
+-- name lookup by ID: their names are learned from what is seen, by object
+-- ID, account-wide (nameDB.objects, with the zone in nameDB.objectZones):
+-- the soft-interact target (UnitName / UnitGUID "softinteract"), a tooltip
+-- whose data carries the object's GUID, and the object tooltip shown just
+-- before a loot. Names.lua's ns.KNOWN_OBJECTS is the shipped fallback.
+local function Zone()
+	return Plain(GetRealZoneText and GetRealZoneText()) or Plain(GetZoneText()) or "Unknown"
+end
+
+local function ObjectName(id)
+	if type(id) ~= "number" then
+		return nil
+	end
+	return (nameDB and nameDB.objects[id]) or (ns.KNOWN_OBJECTS and ns.KNOWN_OBJECTS[id])
+end
+ns.ObjectName = ObjectName
+
+local function RememberObject(id, name)
+	if not (nameDB and type(id) == "number" and type(name) == "string" and name ~= "") then
+		return
+	end
+	nameDB.objects[id] = name
+	nameDB.objectZones[id] = InstanceName() or Zone()
+end
+
+local function Learn(unit)
+	local guid, name = Plain(UnitGUID(unit)), Plain(UnitName(unit))
+	if guid and name then
+		guidNames[guid] = name
+		local kind, id = GuidParts(guid)
+		if id and (kind == "Creature" or kind == "Vehicle") then
+			Remember(id, name)
+		elseif id and kind == "GameObject" then
+			RememberObject(id, name)
+		end
+	end
+end
+
+-- The object the interact key would use (soft targeting).
+API.On("PLAYER_SOFT_INTERACT_CHANGED", function()
+	Learn("softinteract")
+end)
+
+-- A tooltip whose data names a world object's GUID.
+if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall and Enum and Enum.TooltipDataType and Enum.TooltipDataType.Object then
+	TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Object, function(tooltip, data)
+		local guid = type(data) == "table" and Plain(data.guid)
+		if type(guid) ~= "string" then
+			return
+		end
+		local kind, id = GuidParts(guid)
+		local line = type(data.lines) == "table" and data.lines[1]
+		local name = line and Plain(line.leftText)
+		if kind == "GameObject" and id and name then
+			RememberObject(id, name)
+		end
+	end)
+end
+
+API.On("PLAYER_TARGET_CHANGED", function()
+	Learn("target")
+end)
+API.On("UPDATE_MOUSEOVER_UNIT", function()
+	Learn("mouseover")
+end)
+API.On("NAME_PLATE_UNIT_ADDED", function(_, unit)
+	Learn(unit)
+end)
+
+-- A world object's tooltip (a chest, a vein, a school): its first line.
+GameTooltip:HookScript("OnShow", function(self)
+	if self:GetUnit() or self:GetItem() then
+		return
+	end
+	local line = _G.GameTooltipTextLeft1
+	local text = line and Plain(line:GetText())
+	if text and text ~= "" then
+		lastObject = { name = text, time = GetTime() }
+	end
+end)
+
+-- A creature's name from its ID alone: the game's own tooltip for a unit
+-- link (C_TooltipInfo.GetHyperlink), its first line. In an instance names
+-- can be secret, and the game may not have the name cached yet: what is not
+-- found is tried again later (a zone change, leaving the instance, a timer),
+-- from nameDB.pending.
+
+local function CreatureLink(id)
+	return ("unit:Creature-0-0-0-0-%d-0000000000"):format(id)
+end
+
+local function LookUpName(id)
+	if not (C_TooltipInfo and C_TooltipInfo.GetHyperlink) then
+		return nil
+	end
+	local ok, data = pcall(C_TooltipInfo.GetHyperlink, CreatureLink(id))
+	local line = ok and type(data) == "table" and type(data.lines) == "table" and data.lines[1]
+	local text = line and Plain(line.leftText)
+	if type(text) == "string" and text ~= "" and text ~= _G.UNKNOWNOBJECT and text ~= _G.UNKNOWN then
+		return text
+	end
+end
+
+local resolving
+local function ResolveNames(tries)
+	if not nameDB then
+		return
+	end
+	local found, left = false, false
+	for id in pairs(nameDB.pending) do
+		if nameDB.names[id] then
+			nameDB.pending[id] = nil
+		else
+			local name = LookUpName(id)
+			if name then
+				-- Looked up outside, it keeps the instance it was looted in.
+				nameDB.names[id] = name
+				nameDB.pending[id] = nil
+				found = true
+			else
+				left = true
+			end
+		end
+	end
+	if found then
+		Changed()
+	end
+	-- The game fetches names it has not cached: look again shortly.
+	tries = tries or 0
+	if left and tries < 5 and not resolving then
+		resolving = true
+		C_Timer.After(3, function()
+			resolving = nil
+			ResolveNames(tries + 1)
+		end)
+	end
+end
+
+local function NeedName(id)
+	if nameDB and type(id) == "number" and not nameDB.names[id] then
+		nameDB.pending[id] = true
+		local instance = InstanceName()
+		if instance then
+			nameDB.instanced[id] = instance
+		end
+	end
+end
+
+-- The name a creature record shows: the one learned for its ID, else the
+-- one it was recorded with (nil while it is not known yet).
+function ns.CreatureName(id, recorded)
+	if nameDB and nameDB.names[id] then
+		return nameDB.names[id]
+	end
+	if recorded and not recorded:find("^Creature %d+$") then
+		return recorded
+	end
+	NeedName(id)
+	return KnownName(id)
+end
+
+local function RecentObjectName()
+	if lastObject and GetTime() - lastObject.time <= TOOLTIP_WINDOW then
+		return lastObject.name
+	end
+end
+
+-- Casts and containers ---------------------------------------------------------------
+-- The last profession cast (by its name), and the last item used from the
+-- bags (a lockbox about to open).
+
+local lastCast -- { kind, time }
+local CASTS = {
+	{ "skinning", "skinning" },
+	{ "pick pocket", "pickpocket" },
+	{ "mining", "gather" },
+	{ "herb gathering", "gather" },
+	{ "herbalism", "gather" },
+	{ "opening", "opening" },
+	{ "pick lock", "opening" },
+	{ "fishing", "fishing" },
+}
+
+local function SpellName(spellID)
+	if C_Spell and C_Spell.GetSpellName then
+		return Plain(C_Spell.GetSpellName(spellID))
+	end
+end
+
+API.OnPlayer("UNIT_SPELLCAST_SUCCEEDED", function(_, _, _, spellID)
+	local name = spellID and not API.IsSecret(spellID) and SpellName(spellID)
+	if not name then
+		return
+	end
+	name = name:lower()
+	for _, cast in ipairs(CASTS) do
+		if name:find(cast[1], 1, true) then
+			lastCast = { kind = cast[2], time = GetTime() }
+			return
+		end
+	end
+end)
+
+local function RecentCast()
+	if lastCast and GetTime() - lastCast.time <= CAST_WINDOW then
+		return lastCast.kind
+	end
+end
+
+local lastUsed -- { id, name, time }
+local function NoteUsed(bag, slot)
+	local info = C_Container and C_Container.GetContainerItemInfo and C_Container.GetContainerItemInfo(bag, slot)
+	if info and info.itemID then
+		local name = info.hyperlink and info.hyperlink:match("%[(.-)%]")
+		lastUsed = { id = info.itemID, name = name, time = GetTime() }
+	end
+end
+if C_Container and C_Container.UseContainerItem then
+	hooksecurefunc(C_Container, "UseContainerItem", NoteUsed)
+end
+
+-- Items ------------------------------------------------------------------------------
+
+local function ItemID(link)
+	return link and tonumber(link:match("item:(%d+)"))
+end
+ns.ItemID = ItemID
+
+-- What one of an item sells to a vendor for, or nil until the game has it.
+local requested = {}
+function ns.SellPrice(link)
+	if not link or not (C_Item and C_Item.GetItemInfo) then
+		return nil
+	end
+	local price = select(11, C_Item.GetItemInfo(link))
+	if price == nil then
+		local id = ItemID(link)
+		if id and not requested[id] and C_Item.RequestLoadItemDataByID then
+			requested[id] = true
+			C_Item.RequestLoadItemDataByID(id)
+		end
+	end
+	return price
+end
+
+local loadPending = false
+API.On("ITEM_DATA_LOAD_RESULT", function()
+	if not loadPending then
+		loadPending = true
+		C_Timer.After(0.3, function()
+			loadPending = false
+			Changed()
+		end)
+	end
+end)
+
+-- Recording --------------------------------------------------------------------------
+
+-- Fine-grained totals key.
+local function TotalKey(event)
+	return table.concat({ event.kind, tostring(event.id), event.zone or "", event.school or "" }, "|")
+end
+
+local function AddItems(into, items, when)
+	for _, item in ipairs(items) do
+		local key = ItemID(item.link) or item.link or item.name
+		local entry = into[key]
+		if not entry then
+			entry = { link = item.link, name = item.name, icon = item.icon, quality = item.quality, count = 0 }
+			into[key] = entry
+		end
+		entry.count = entry.count + item.count
+		-- When it was last looted, for sorting by Newest.
+		if when then
+			entry.last = math.max(entry.last or 0, when)
+		end
+	end
+end
+
+ns.TotalKey = TotalKey
+
+local function AddTo(totals, event)
+	local key = TotalKey(event)
+	local total = totals[key]
+	if not total then
+		total = { kind = event.kind, id = event.id, name = event.name, zone = event.zone, school = event.school,
+			count = 0, money = 0, items = {} }
+		totals[key] = total
+	end
+	total.name = event.name or total.name
+	total.count = total.count + 1
+	total.money = total.money + event.money
+	total.last = event.time
+	AddItems(total.items, event.items, event.time)
+end
+
+-- Takes one event back out of a totals table (its X in the per-loot view).
+function ns.Subtract(totals, event)
+	local key = TotalKey(event)
+	local total = totals and totals[key]
+	if not total then
+		return
+	end
+	total.count = total.count - 1
+	total.money = math.max(0, total.money - (event.money or 0))
+	for _, item in ipairs(event.items or {}) do
+		local itemKey = ItemID(item.link) or item.link or item.name
+		local have = total.items[itemKey]
+		if have then
+			have.count = have.count - item.count
+			if have.count <= 0 then
+				total.items[itemKey] = nil
+			end
+		end
+	end
+	if total.count <= 0 then
+		totals[key] = nil
+	end
+end
+
+-- Scopes: every loot also goes into this login session's totals and, inside
+-- an instance, the current run's (db.sessionTotals, db.runTotals), so the
+-- view can show only those. Events carry the session and run they were in.
+local function Record(event)
+	event.session = db.session
+	event.run = db.run and db.run.id or nil
+	db.events[#db.events + 1] = event
+	while #db.events > LOG_LIMIT do
+		table.remove(db.events, 1)
+	end
+	AddTo(db.totals, event)
+	AddTo(db.sessionTotals, event)
+	if db.run and db.run.inside then
+		AddTo(db.runTotals, event)
+	end
+	Changed()
+end
+
+-- Sources already recorded this session (a corpse opened twice, a chest
+-- left half looted), by kind and GUID.
+local recorded = {}
+
+
+-- What a source GUID is, as an event's kind, ID and name; nil to skip.
+local function Classify(guid, fishing, cast)
+	local unitType, id = GuidParts(guid)
+	if fishing then
+		if not Setting("trackFishing") then
+			return nil
+		end
+		local school
+		if unitType == "GameObject" and id and not BOBBERS[id] then
+			school = ObjectName(id) or RecentObjectName()
+			if school then
+				RememberObject(id, school)
+			end
+			school = school or ("School " .. id)
+		end
+		return "fishing", school or "zone", nil, school
+	end
+	if unitType == "Creature" or unitType == "Vehicle" then
+		if not Setting("trackCreatures") then
+			return nil
+		end
+		local name = guidNames[guid] or (nameDB and nameDB.names[id])
+		if id and InstanceName() and nameDB then
+			nameDB.instanced[id] = InstanceName()
+		end
+		if not name and id then
+			name = LookUpName(id)
+			if name then
+				Remember(id, name)
+			else
+				NeedName(id)
+				name = KnownName(id)
+			end
+		end
+		if cast == "pickpocket" then
+			return "pickpocket", id, name
+		elseif cast == "skinning" then
+			return "skinning", id, name
+		end
+		return "creature", id, name
+	elseif unitType == "GameObject" then
+		if NODE_GROUPS[id] or cast == "gather" then
+			if not Setting("trackNodes") then
+				return nil
+			end
+			local name = NODE_GROUPS[id] or ObjectName(id) or RecentObjectName()
+			if name and not NODE_GROUPS[id] then
+				RememberObject(id, name)
+			end
+			return "node", NODE_GROUPS[id] or id, name or ("Node " .. tostring(id))
+		end
+		if not Setting("trackChests") then
+			return nil
+		end
+		-- A name known for the ID wins over the last tooltip, which may be
+		-- some other object's.
+		local name = ObjectName(id) or RecentObjectName()
+		if name then
+			RememberObject(id, name)
+		end
+		return "chest", id, name or ("Chest " .. tostring(id))
+	elseif unitType == "Item" then
+		if not Setting("trackLockboxes") then
+			return nil
+		end
+		if lastUsed and GetTime() - lastUsed.time <= 10 then
+			return "lockbox", lastUsed.id, lastUsed.name or ("Container " .. lastUsed.id)
+		end
+		return "lockbox", 0, "Container"
+	end
+end
+
+local MONEY = (Enum and Enum.LootSlotType and Enum.LootSlotType.Money) or (LOOT_SLOT_MONEY) or 2
+
+-- "1 Gold 2 Silver 3 Copper" (a money slot's text) in copper, when a
+-- source's quantity does not say.
+local function ParseMoney(text)
+	if type(text) ~= "string" then
+		return 0
+	end
+	local copper = 0
+	for amount, unit in text:gmatch("(%d+)%s*(%a+)") do
+		unit = unit:lower()
+		if unit:find("^g") then
+			copper = copper + amount * 10000
+		elseif unit:find("^s") then
+			copper = copper + amount * 100
+		elseif unit:find("^c") then
+			copper = copper + amount
+		end
+	end
+	return copper
+end
+
+local function OnLootOpened()
+	if not db then
+		return
+	end
+	local fishing = IsFishingLoot and Plain(IsFishingLoot()) or false
+	local cast = RecentCast()
+	local buckets, order = {}, {}
+	local function Bucket(guid)
+		local bucket = buckets[guid]
+		if not bucket then
+			bucket = { money = 0, items = {} }
+			buckets[guid] = bucket
+			order[#order + 1] = guid
+		end
+		return bucket
+	end
+	for slot = 1, GetNumLootItems() do
+		local slotType = GetLootSlotType(slot)
+		local icon, name, quantity, _, quality = GetLootSlotInfo(slot)
+		local link = GetLootSlotLink(slot)
+		local sources = { GetLootSourceInfo(slot) }
+		if #sources == 0 then
+			-- No source given (open water fishing on some builds): one pseudo source.
+			sources = { fishing and "Fishing" or "Unknown", quantity or 1 }
+		end
+		for i = 1, #sources, 2 do
+			local guid, amount = Plain(sources[i]), Plain(sources[i + 1])
+			if guid then
+				local bucket = Bucket(guid)
+				if slotType == MONEY then
+					bucket.money = bucket.money + ((amount and amount > 0) and amount or ParseMoney(name))
+				else
+					bucket.items[#bucket.items + 1] = {
+						link = link, name = Plain(name), icon = icon, quality = Plain(quality),
+						count = (#sources > 2 and amount) or quantity or 1,
+					}
+				end
+			end
+		end
+	end
+	local now = time()
+	for _, guid in ipairs(order) do
+		local kind, id, sourceName, school
+		if guid == "Fishing" then
+			if Setting("trackFishing") then
+				kind, id = "fishing", "zone"
+			end
+		elseif guid ~= "Unknown" then
+			kind, id, sourceName, school = Classify(guid, fishing, cast)
+		end
+		local seenKey = kind and (kind .. guid)
+		if kind and (guid == "Fishing" or not recorded[seenKey]) then
+			recorded[seenKey] = true
+			local bucket = buckets[guid]
+			Record({
+				kind = kind, id = id, name = sourceName, school = school,
+				zone = kind == "fishing" and Zone() or nil,
+				money = bucket.money, items = bucket.items, time = now,
+			})
+		end
+	end
+	lastCast = nil
+end
+
+API.On("LOOT_OPENED", function(...)
+	OnLootOpened(...)
+	ResolveNames()
+end)
+
+-- Names secret in an instance read plainly after it: look again on each
+-- zone change.
+-- The session and the instance run new loot belongs to.
+local function UpdateScopes(isInitialLogin)
+	if not db then
+		return
+	end
+	-- A new login (not a reload) starts a new session: told by when this
+	-- login began (GetSessionTime runs on across reloads), else the event's
+	-- isInitialLogin.
+	local loginAt = GetSessionTime and (time() - GetSessionTime()) or nil
+	local newLogin
+	if loginAt then
+		newLogin = not db.sessionLogin or math.abs(db.sessionLogin - loginAt) > 120
+	else
+		newLogin = isInitialLogin
+	end
+	if newLogin or not db.session then
+		db.session = time()
+		db.sessionLogin = loginAt
+		db.sessionTotals = {}
+	end
+	-- Entering an instance other than the last run's starts a new run; going
+	-- back into the same one (a corpse run) carries on with it.
+	local inInstance = IsInInstance and IsInInstance()
+	local name, _, _, _, _, _, _, instanceID = GetInstanceInfo()
+	if inInstance then
+		if not (db.run and db.run.instanceID == instanceID) then
+			db.run = { id = time(), instanceID = instanceID, name = Plain(name) }
+			db.runTotals = {}
+		end
+		db.run.inside = true
+	elseif db.run then
+		db.run.inside = false
+	end
+	Changed()
+end
+
+API.On("PLAYER_ENTERING_WORLD", function(_, isInitialLogin)
+	C_Timer.After(2, ResolveNames)
+	UpdateScopes(isInitialLogin)
+end)
+API.On("ZONE_CHANGED_NEW_AREA", function()
+	C_Timer.After(2, ResolveNames)
+end)
+
+-- Saved data -------------------------------------------------------------------------
+
+API.On("ADDON_LOADED", function(_, name)
+	if name ~= addonName then
+		return
+	end
+	LootTrackerDB = LootTrackerDB or {}
+	db = LootTrackerDB
+	db.events = db.events or {}
+	db.totals = db.totals or {}
+	db.names = db.names or {}
+	LootTrackerNames = LootTrackerNames or {}
+	nameDB = LootTrackerNames
+	nameDB.names = nameDB.names or {}
+	nameDB.instanced = nameDB.instanced or {}
+	nameDB.pending = nameDB.pending or {}
+	nameDB.objects = nameDB.objects or {}
+	nameDB.objectZones = nameDB.objectZones or {}
+	ns.nameDB = nameDB
+	-- This character's names from before the database, moved into it.
+	for id, name in pairs(db.names) do
+		if not nameDB.names[id] then
+			nameDB.names[id] = name
+		end
+	end
+	wipe(db.names)
+	db.sessionTotals = db.sessionTotals or {}
+	db.runTotals = db.runTotals or {}
+	ns.db = db
+	-- Creatures recorded without a name (by their ID) are looked up again.
+	local CREATURE = { creature = true, skinning = true, pickpocket = true }
+	for _, list in ipairs({ db.totals, db.events }) do
+		for _, record in pairs(list) do
+			if CREATURE[record.kind] then
+				ns.CreatureName(record.id, record.name)
+			end
+		end
+	end
+	C_Timer.After(2, ResolveNames)
+	UpdateScopes(false)
+	Changed()
+end)
+
+-- The instanced names as Names.lua lines, to ship as the fallback list.
+function ns.ExportNames()
+	local ids = {}
+	for id in pairs(nameDB and nameDB.instanced or {}) do
+		ids[#ids + 1] = id
+	end
+	table.sort(ids, function(a, b)
+		local ia, ib = nameDB.instanced[a], nameDB.instanced[b]
+		if ia ~= ib then
+			return ia < ib
+		end
+		return a < b
+	end)
+	local out = { "-- Paste into LootTracker/Names.lua, inside ns.KNOWN_NAMES." }
+	local known, waiting = 0, 0
+	for _, id in ipairs(ids) do
+		local name = nameDB.names[id]
+		if name then
+			known = known + 1
+			out[#out + 1] = ("\t[%d] = %q, -- %s"):format(id, name, nameDB.instanced[id])
+		else
+			waiting = waiting + 1
+			out[#out + 1] = ("\t-- [%d] = ?, -- %s (no name yet)"):format(id, nameDB.instanced[id])
+		end
+	end
+	out[#out + 1] = ("-- %d named, %d waiting for a name."):format(known, waiting)
+	-- World objects, by zone.
+	local objects = {}
+	for id in pairs(nameDB and nameDB.objects or {}) do
+		objects[#objects + 1] = id
+	end
+	table.sort(objects, function(a, b)
+		local za, zb = nameDB.objectZones[a] or "", nameDB.objectZones[b] or ""
+		if za ~= zb then
+			return za < zb
+		end
+		return a < b
+	end)
+	out[#out + 1] = ""
+	out[#out + 1] = "-- Paste into LootTracker/Names.lua, inside ns.KNOWN_OBJECTS."
+	for _, id in ipairs(objects) do
+		out[#out + 1] = ("\t[%d] = %q, -- %s"):format(id, nameDB.objects[id], nameDB.objectZones[id] or "?")
+	end
+	out[#out + 1] = ("-- %d world objects."):format(#objects)
+	API.ShowCopyBox("Loot Tracker: name database", table.concat(out, "\n"))
+end
+
+function ns.Reset()
+	if not db then
+		return
+	end
+	wipe(db.events)
+	wipe(db.totals)
+	wipe(db.sessionTotals)
+	wipe(db.runTotals)
+	wipe(recorded)
+	Changed()
+end
+
+API.RegisterProbe(function()
+	local totals = 0
+	for _ in pairs(db and db.totals or {}) do
+		totals = totals + 1
+	end
+	local named, instanced, pending = 0, 0, 0
+	for _ in pairs(nameDB and nameDB.names or {}) do named = named + 1 end
+	for _ in pairs(nameDB and nameDB.instanced or {}) do instanced = instanced + 1 end
+	for _ in pairs(nameDB and nameDB.pending or {}) do pending = pending + 1 end
+	local objects = 0
+	for _ in pairs(nameDB and nameDB.objects or {}) do objects = objects + 1 end
+	API.Print(("Loot Tracker: world objects: %d named; softinteract unit %s"):format(objects, (UnitExists and UnitExists("softinteract")) and "now" or "none now"))
+	API.Print(("Loot Tracker: names: %d known, %d looted in instances, %d waiting; C_TooltipInfo.GetHyperlink %s"):format(
+		named, instanced, pending, (C_TooltipInfo and C_TooltipInfo.GetHyperlink) and "yes" or "MISSING"))
+	return "Loot Tracker", ("%d sources, %d events kept; GetLootSourceInfo %s, IsFishingLoot %s, C_Spell.GetSpellName %s, C_Item.GetItemInfo %s, C_Container.UseContainerItem %s"):format(
+		totals, db and #db.events or 0,
+		GetLootSourceInfo and "yes" or "MISSING",
+		IsFishingLoot and "yes" or "MISSING",
+		(C_Spell and C_Spell.GetSpellName) and "yes" or "MISSING",
+		(C_Item and C_Item.GetItemInfo) and "yes" or "MISSING",
+		(C_Container and C_Container.UseContainerItem) and "yes" or "MISSING")
+end)

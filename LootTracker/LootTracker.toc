@@ -1,0 +1,15 @@
+## Interface: 16001
+## Title: Loot Tracker
+## Notes: Tracks what you loot and from what: creatures, skinning, pickpocketing, chests, lockboxes, resource nodes and fishing, with gold and item values (vendor or auction). Standalone: needs no other addon.
+## Author: cloudfan
+## Version: 1.0.0
+## SavedVariables: LootTrackerSettings, LootTrackerPrices, LootTrackerNames
+## SavedVariablesPerCharacter: LootTrackerDB
+## IconTexture: Interface\Icons\INV_Misc_Bag_10
+
+Core.lua
+Names.lua
+Tracking.lua
+Auction.lua
+View.lua
+Settings.lua
