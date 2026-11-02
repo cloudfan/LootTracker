@@ -1,6 +1,6 @@
 # Loot Tracker
 
-What you loot and from what, for World of Warcraft: Forever (`## Interface: 16001`). Standalone: needs no library and no other addon. It is the standalone version of [Pillars UI](https://github.com/cloudfan/PillarsUI)'s Loot Tracker module; with that module turned on, this addon stays off (use one of the two).
+What you loot and from what, for World of Warcraft: Forever (`## Interface: 16001`). Standalone: needs no other addon. It bundles LibSharedMedia-3.0, so fonts, bar textures and backgrounds that other addons register (SharedMedia packs, UI suites) can be picked in its settings, beside the game's own. It is the standalone version of [Pillars UI](https://github.com/cloudfan/PillarsUI)'s Loot Tracker module; with that module turned on, this addon stays off (use one of the two).
 
 - **Sources:** creatures (each looted corpse a kill, grouped by creature or listed one by one), their skinning and pickpocketing (their own entries, or in the creature's), chests, lockboxes, resource nodes (Copper Veins together, Peaceblooms together) and fishing (by zone, or schools by type). No combat log: the loot window says where each item and coin came from.
 - **Value:** gold beside each source's name, with its items' vendor value, or their auction value from a scan of your realm's auction house (once every 15 minutes, at the auction house).
@@ -32,16 +32,16 @@ Options > AddOns > Loot Tracker, or `/loot`.
 | View | Scroll Bar, Scroll Bar Width | On, 6 | |
 | View | Portraits (experimental) | Off | |
 | Background Bars | Source Row Bars, Item Line Bars | Off, Off | Bars behind source rows (both views) and item lines (List view). |
-| Background Bars | Source Row Texture, Item Line Texture | Blizzard | The game's bar textures. |
+| Background Bars | Source Row Texture, Item Line Texture | Blizzard | Any SharedMedia bar texture. |
 | Background Bars | Source Row Color / Opacity | Bronze, 35% | |
 | Background Bars | Line Bar Color, Custom Line Color | Item Quality | |
 | Background Bars | Line Bar Length, Line Bar Opacity | Full Width, 25% | Full Width or By Count. |
-| Text | Font, Text Shadow | Friz Quadrata, Soft | The game's fonts; None, Soft, Outline, Thick Outline. |
+| Text | Font, Text Shadow | Friz Quadrata, Soft | Any SharedMedia font; None, Soft, Outline, Thick Outline. |
 | Text | Text Size | Auto | 0 (Auto) to 24. |
 | Frame | Unlock (drag it) | Off | Also `/loot unlock`. |
 | Frame | Arrow Side | Right | |
 | Frame | Width, Height | 260, 320 | |
-| Frame | Border, Background, Background Opacity | On, Solid, 80% | |
+| Frame | Border, Background, Background Opacity | On, Solid, 80% | Any SharedMedia background. |
 | Frame | Reset Position, Reset All Settings | | |
 
 ## Slash commands

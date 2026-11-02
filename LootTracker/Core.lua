@@ -235,7 +235,40 @@ local MEDIA = {
 	},
 }
 
+-- LibSharedMedia-3.0 (bundled in Libs, and shared with every other addon that
+-- has it): the game's own media above are registered into it, so their names
+-- always work, and fonts, bar textures and backgrounds other addons register
+-- (SharedMedia packs, UI suites) show up in the lists too.
+local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
+API.LSM = LSM
+if LSM then
+	-- Only what SharedMedia lacks: it already knows most of the game's own
+	-- (under its own names); ours still resolve by name (Fetch, below).
+	for kind, entries in pairs(MEDIA) do
+		local known = {}
+		for _, path in pairs(LSM:HashTable(kind) or {}) do
+			known[tostring(path):lower()] = true
+		end
+		for _, entry in ipairs(entries) do
+			if not known[entry[2]:lower()] then
+				LSM:Register(kind, entry[1], entry[2])
+			end
+		end
+	end
+	-- A list that grows while the game runs (other addons registering late).
+	LSM.RegisterCallback(API, "LibSharedMedia_Registered", function(_, kind)
+		API.Fire("MediaRegistered", kind)
+	end)
+end
+
 function API.MediaList(kind)
+	if LSM and LSM.List then
+		local names = {}
+		for _, name in ipairs(LSM:List(kind)) do
+			names[#names + 1] = name
+		end
+		return names
+	end
 	local names = {}
 	for _, entry in ipairs(MEDIA[kind] or {}) do
 		names[#names + 1] = entry[1]
@@ -244,6 +277,9 @@ function API.MediaList(kind)
 end
 
 function API.Fetch(kind, name)
+	if LSM and name and LSM:IsValid(kind, name) then
+		return LSM:Fetch(kind, name)
+	end
 	for _, entry in ipairs(MEDIA[kind] or {}) do
 		if entry[1] == name then
 			return entry[2]
