@@ -370,10 +370,9 @@ end)
 Checkbox(2, "Short values (12g, 34s)", "valueShort", "Lines and icons: the largest coin only, instead of gold, silver and copper.")
 EndRow()
 Checkbox(1, "Vendor Fallback", "valueFallback", "Items with no auction price (not listed at the last scan, or soulbound) show their vendor price, in gray. Off: they show nothing.")
-Checkbox(2, "Auction price in item tooltips", "tooltipAuction", "An item's tooltip: its auction price each and for the stack looted, or that it was not listed.")
+Checkbox(2, "Auction price in item tooltips", "tooltipAuction", "An item's tooltip: its auction price right under the game's Sell Price line, in the same style (each, and for the stack looted), or that it was not listed.")
 EndRow()
-Checkbox(1, "Vendor price in item tooltips", "tooltipVendor", "An item's tooltip: what a vendor pays, each and for the stack looted.")
-Checkbox(2, "Last scan's age in item tooltips", "tooltipScanAge", "An item's tooltip: how long ago the auction house was last scanned.")
+Checkbox(1, "Last scan's age in item tooltips", "tooltipScanAge", "An item's tooltip: how long ago the auction house was last scanned.")
 EndRow()
 Dropdown(1, "Item Sort", "itemSort", Items({
 	{ value = "quality", label = "Quality" },

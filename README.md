@@ -32,7 +32,7 @@ Options > AddOns > Loot Tracker, or `/loot`.
 | View | Stack value on item icons | Off | Icons view: the stack's auction value on each icon. |
 | View | Short values | On | Lines and icons: the largest coin only (12g, 34s, 56c). |
 | View | Vendor Fallback | On | Items with no auction price show their vendor price, in gray. |
-| View | Auction / Vendor price in item tooltips | On / On | An item's tooltip: its auction price (or "not listed") and vendor price, each and for the stack. |
+| View | Auction price in item tooltips | On | An item's tooltip: its auction price right under the game's Sell Price, in the same style (each, and for the stack), or "not listed". |
 | View | Last scan's age in item tooltips | On | An item's tooltip: how long ago the auction house was scanned. |
 | View | Item Sort, Source Sort | Quality, Newest | Quality / Newest / Value; Newest / Value. |
 | View | Item icons in the list, Icon Size | On, 28 | |

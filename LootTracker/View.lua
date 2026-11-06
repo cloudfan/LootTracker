@@ -32,8 +32,7 @@ API.RegisterDefaults(S, {
 	iconValue = false,           -- Icons view: the stack's auction value on each icon
 	valueShort = true,           -- those in short form (12g, 34s, 56c) instead of coins
 	valueFallback = true,        -- items without an auction price at vendor value, in gray
-	tooltipAuction = true,       -- item tooltip: auction price each and for the stack
-	tooltipVendor = true,        -- item tooltip: vendor price each and for the stack
+	tooltipAuction = true,       -- item tooltip: auction price (each, and the stack), under Sell Price
 	tooltipScanAge = true,       -- item tooltip: how old the last scan is
 	-- Text: "global" (and size 0) follow Global Settings.
 	font = "global",
@@ -488,45 +487,64 @@ local function AgeText(seconds)
 	return ("%d days ago"):format(math.floor(seconds / 86400))
 end
 
-local function ShowItemTooltip(self)
-	if not self.link then
+-- The auction price in an item's tooltip, styled as the game's own Sell
+-- Price line (SetTooltipMoney) and put right under it: a line post-call for
+-- the Sell Price line, on tooltips of our item lines and icons only. An item
+-- the game shows no sell price for gets it at the end instead.
+local addedAuction
+
+local function MoneyLine(tooltip, label, copper)
+	if SetTooltipMoney then
+		SetTooltipMoney(tooltip, copper, nil, label)
+	else
+		tooltip:AddLine(label .. " " .. Money(copper), 1, 1, 1)
+	end
+end
+
+local function AddAuctionLines(tooltip)
+	local owner = tooltip.GetOwner and tooltip:GetOwner()
+	if type(owner) ~= "table" or not owner.lootTrackerItem or not owner.link then
 		return
 	end
-	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-	GameTooltip:SetHyperlink(self.link)
-	local count = self.itemCount or 1
-	local auction = Setting("tooltipAuction")
-	local vendor = Setting("tooltipVendor")
-	if auction or vendor then
-		GameTooltip_AddBlankLineToTooltip(GameTooltip)
-	end
-	if auction then
-		local price = ns.AuctionPrice and ns.AuctionPrice(self.link)
-		if price then
-			GameTooltip:AddDoubleLine("Auction (each)", Money(price), 1, 0.82, 0, 1, 1, 1)
-			if count > 1 then
-				GameTooltip:AddDoubleLine(("Auction (x%d)"):format(count), Money(price * count), 1, 0.82, 0, 1, 1, 1)
-			end
-		else
-			GameTooltip:AddDoubleLine("Auction", ns.ScanInfo and ns.ScanInfo() and "not listed" or "no scan yet", 1, 0.82, 0, 0.6, 0.6, 0.6)
+	addedAuction = true
+	local count = owner.itemCount or 1
+	local price = ns.AuctionPrice and ns.AuctionPrice(owner.link)
+	if not Setting("tooltipAuction") then
+		-- (Last scan's age alone, below.)
+	elseif price then
+		MoneyLine(tooltip, "Auction Price:", price)
+		if count > 1 then
+			MoneyLine(tooltip, ("Auction Price (x%d):"):format(count), price * count)
 		end
-	end
-	if vendor then
-		local price = ns.SellPrice(self.link)
-		if price and price > 0 then
-			GameTooltip:AddDoubleLine("Vendor (each)", Money(price), 1, 0.82, 0, 1, 1, 1)
-			if count > 1 then
-				GameTooltip:AddDoubleLine(("Vendor (x%d)"):format(count), Money(price * count), 1, 0.82, 0, 1, 1, 1)
-			end
-		elseif price == 0 then
-			GameTooltip:AddDoubleLine("Vendor", "cannot be sold", 1, 0.82, 0, 0.6, 0.6, 0.6)
-		end
+	else
+		tooltip:AddLine("Auction Price: |cff999999" .. (ns.ScanInfo and ns.ScanInfo() and "not listed" or "no scan yet") .. "|r", 1, 1, 1)
 	end
 	if Setting("tooltipScanAge") and ns.ScanInfo then
 		local scanned = ns.ScanInfo()
 		if scanned then
-			GameTooltip:AddDoubleLine("Last scan", AgeText(math.max(0, time() - scanned)), 0.6, 0.6, 0.6, 0.6, 0.6, 0.6)
+			tooltip:AddLine("Last scan: " .. AgeText(math.max(0, time() - scanned)), 0.6, 0.6, 0.6)
 		end
+	end
+end
+
+if TooltipDataProcessor and TooltipDataProcessor.AddLinePostCall and Enum and Enum.TooltipDataLineType and Enum.TooltipDataLineType.SellPrice then
+	pcall(TooltipDataProcessor.AddLinePostCall, Enum.TooltipDataLineType.SellPrice, function(tooltip)
+		if tooltip == GameTooltip then
+			AddAuctionLines(tooltip)
+		end
+	end)
+end
+
+local function ShowItemTooltip(self)
+	if not self.link then
+		return
+	end
+	self.lootTrackerItem = true
+	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+	addedAuction = false
+	GameTooltip:SetHyperlink(self.link)
+	if not addedAuction then
+		AddAuctionLines(GameTooltip)
 	end
 	GameTooltip:Show()
 end
