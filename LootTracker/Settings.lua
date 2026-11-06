@@ -361,6 +361,20 @@ Button(2, "Scan Now", function()
 	ns.Scan()
 end, "Scan the auction house now (it must be open). The chat says how it went.")
 EndRow()
+Checkbox(1, "Stack value on item lines", "lineValue", "List view: the stack's auction value beside each item's count. Gold: an auction price; gray: a vendor price standing in (Vendor Fallback).", NotList)
+Checkbox(2, "Price each on item lines", "lineValueEach", "List view: one item's auction price beside its count, in brackets after the stack value when both are on.", NotList)
+EndRow()
+Checkbox(1, "Stack value on item icons", "iconValue", "Icons view: the stack's auction value in each icon's top corner.", function()
+	return Get("view") ~= "icons"
+end)
+Checkbox(2, "Short values (12g, 34s)", "valueShort", "Lines and icons: the largest coin only, instead of gold, silver and copper.")
+EndRow()
+Checkbox(1, "Vendor Fallback", "valueFallback", "Items with no auction price (not listed at the last scan, or soulbound) show their vendor price, in gray. Off: they show nothing.")
+Checkbox(2, "Auction price in item tooltips", "tooltipAuction", "An item's tooltip: its auction price each and for the stack looted, or that it was not listed.")
+EndRow()
+Checkbox(1, "Vendor price in item tooltips", "tooltipVendor", "An item's tooltip: what a vendor pays, each and for the stack looted.")
+Checkbox(2, "Last scan's age in item tooltips", "tooltipScanAge", "An item's tooltip: how long ago the auction house was last scanned.")
+EndRow()
 Dropdown(1, "Item Sort", "itemSort", Items({
 	{ value = "quality", label = "Quality" },
 	{ value = "newest", label = "Newest" },

@@ -26,6 +26,15 @@ API.RegisterDefaults(S, {
 	-- View
 	itemValue = "vendor",        -- "vendor", "auction" (the last scan's lowest buyout) or "none"
 	auctionAutoScan = true,      -- scan when the auction house opens (with Auction Value)
+	-- Per-item auction value, each a toggle.
+	lineValue = true,            -- List view: each line's stack at its auction price
+	lineValueEach = false,       -- List view: one item's auction price on each line
+	iconValue = false,           -- Icons view: the stack's auction value on each icon
+	valueShort = true,           -- those in short form (12g, 34s, 56c) instead of coins
+	valueFallback = true,        -- items without an auction price at vendor value, in gray
+	tooltipAuction = true,       -- item tooltip: auction price each and for the stack
+	tooltipVendor = true,        -- item tooltip: vendor price each and for the stack
+	tooltipScanAge = true,       -- item tooltip: how old the last scan is
 	-- Text: "global" (and size 0) follow Global Settings.
 	font = "global",
 	fontSize = 0,                -- 0: the tracker's own sizes; else the lines' size, the rest in step
@@ -251,6 +260,21 @@ local function Money(copper)
 	return ("%dg %ds %dc"):format(copper / 10000, (copper / 100) % 100, copper % 100)
 end
 
+-- Short money: the largest coin only (12g, 34s, 56c); 10g and up rounded.
+local function ShortMoney(copper)
+	copper = math.floor(copper or 0)
+	if copper >= 10000 then
+		local gold = copper / 10000
+		if gold >= 10 then
+			return ("%dg"):format(math.floor(gold + 0.5))
+		end
+		return (("%.1fg"):format(math.floor(gold * 10) / 10):gsub("%.0g$", "g"))
+	elseif copper >= 100 then
+		return ("%ds"):format(math.floor(copper / 100))
+	end
+	return ("%dc"):format(copper)
+end
+
 -- An entry's value: its money, and with Vendor Value its items' sell price.
 local function Value(entry)
 	local value = entry.money
@@ -427,12 +451,84 @@ local function Font(fontString, size)
 	})
 end
 
-local function ShowItemTooltip(self)
-	if self.link then
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetHyperlink(self.link)
-		GameTooltip:Show()
+-- One item's auction price, and whether it is one (false: the vendor
+-- price standing in with Vendor Fallback); nil with neither.
+local function AuctionEach(link)
+	local price = ns.AuctionPrice and ns.AuctionPrice(link)
+	if price then
+		return price, true
 	end
+	if Setting("valueFallback") then
+		price = ns.SellPrice(link)
+		if price and price > 0 then
+			return price, false
+		end
+	end
+	return nil
+end
+
+-- The value text for a line or an icon (its color: gold, or gray at
+-- vendor value), or nil.
+local function ValueText(link, count, each)
+	local price, auction = AuctionEach(link)
+	if not price then
+		return nil
+	end
+	local copper = each and price or price * (count or 1)
+	local text = Setting("valueShort") and ShortMoney(copper) or Money(copper)
+	return text, auction
+end
+
+local function AgeText(seconds)
+	if seconds < 3600 then
+		return ("%d min ago"):format(math.max(1, math.floor(seconds / 60)))
+	elseif seconds < 86400 then
+		return ("%d h ago"):format(math.floor(seconds / 3600))
+	end
+	return ("%d days ago"):format(math.floor(seconds / 86400))
+end
+
+local function ShowItemTooltip(self)
+	if not self.link then
+		return
+	end
+	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+	GameTooltip:SetHyperlink(self.link)
+	local count = self.itemCount or 1
+	local auction = Setting("tooltipAuction")
+	local vendor = Setting("tooltipVendor")
+	if auction or vendor then
+		GameTooltip_AddBlankLineToTooltip(GameTooltip)
+	end
+	if auction then
+		local price = ns.AuctionPrice and ns.AuctionPrice(self.link)
+		if price then
+			GameTooltip:AddDoubleLine("Auction (each)", Money(price), 1, 0.82, 0, 1, 1, 1)
+			if count > 1 then
+				GameTooltip:AddDoubleLine(("Auction (x%d)"):format(count), Money(price * count), 1, 0.82, 0, 1, 1, 1)
+			end
+		else
+			GameTooltip:AddDoubleLine("Auction", ns.ScanInfo and ns.ScanInfo() and "not listed" or "no scan yet", 1, 0.82, 0, 0.6, 0.6, 0.6)
+		end
+	end
+	if vendor then
+		local price = ns.SellPrice(self.link)
+		if price and price > 0 then
+			GameTooltip:AddDoubleLine("Vendor (each)", Money(price), 1, 0.82, 0, 1, 1, 1)
+			if count > 1 then
+				GameTooltip:AddDoubleLine(("Vendor (x%d)"):format(count), Money(price * count), 1, 0.82, 0, 1, 1, 1)
+			end
+		elseif price == 0 then
+			GameTooltip:AddDoubleLine("Vendor", "cannot be sold", 1, 0.82, 0, 0.6, 0.6, 0.6)
+		end
+	end
+	if Setting("tooltipScanAge") and ns.ScanInfo then
+		local scanned = ns.ScanInfo()
+		if scanned then
+			GameTooltip:AddDoubleLine("Last scan", AgeText(math.max(0, time() - scanned)), 0.6, 0.6, 0.6, 0.6, 0.6, 0.6)
+		end
+	end
+	GameTooltip:Show()
 end
 
 local PORTRAIT_ICONS = {
@@ -685,6 +781,9 @@ local function Line(i)
 	line.count = line:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 	line.count:SetPoint("RIGHT", -2, 0)
 	line.count:SetJustifyH("RIGHT")
+	line.value = line:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	line.value:SetPoint("RIGHT", line.count, "LEFT", -6, 0)
+	line.value:SetJustifyH("RIGHT")
 	line.name:SetPoint("RIGHT", line.count, "LEFT", -6, 0)
 	line.highlight = line:CreateTexture(nil, "HIGHLIGHT")
 	line.highlight:SetAllPoints()
@@ -710,6 +809,9 @@ local function Icon(i)
 	button.count = button:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 	button.count:SetPoint("BOTTOMRIGHT", -1, 2)
 	button.count:SetJustifyH("RIGHT")
+	button.value = button:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	button.value:SetPoint("TOPLEFT", 1, -2)
+	button.value:SetJustifyH("LEFT")
 	button.highlight = button:CreateTexture(nil, "HIGHLIGHT")
 	button.highlight:SetAllPoints()
 	button.highlight:SetColorTexture(1, 1, 1, 0.15)
@@ -844,6 +946,7 @@ Render = function()
 				customR, customG, customB = API.ResolveColor(Setting("lineBarColor"))
 			end
 		end
+		local showStack, showEach = Setting("lineValue"), Setting("lineValueEach")
 		if listView then
 			for _, item in ipairs(items) do
 				l = l + 1
@@ -861,9 +964,36 @@ Render = function()
 				line.name:SetText(item.name or item.link or "?")
 				line.name:ClearAllPoints()
 				line.name:SetPoint("LEFT", line, "LEFT", withIcons and LINE_H + 2 or 0, 0)
-				line.name:SetPoint("RIGHT", line.count, "LEFT", -6, 0)
 				line.count:SetTextColor(1, 1, 1)
 				line.count:SetText("x" .. item.count)
+				line.itemCount = item.count
+				-- Auction value: the stack's, one item's, or both ("1.2g (12s)").
+				local text, auction
+				if showStack or showEach then
+					local stack, each
+					stack, auction = ValueText(item.link, item.count, false)
+					each = ValueText(item.link, item.count, true)
+					if stack and showStack and showEach and (item.count or 1) > 1 then
+						text = ("%s (%s)"):format(stack, each)
+					elseif stack then
+						text = showStack and stack or each
+					end
+				end
+				Font(line.value, 11)
+				if text then
+					line.value:SetText(text)
+					if auction then
+						line.value:SetTextColor(1, 0.82, 0)
+					else
+						line.value:SetTextColor(0.6, 0.6, 0.6)
+					end
+					line.value:Show()
+					line.name:SetPoint("RIGHT", line.value, "LEFT", -6, 0)
+				else
+					line.value:SetText("")
+					line.value:Hide()
+					line.name:SetPoint("RIGHT", line.count, "LEFT", -6, 0)
+				end
 				if lineBars then
 					line.bar:SetTexture(barPath)
 					local r, g, b = customR, customG, customB
@@ -879,6 +1009,7 @@ Render = function()
 				y = y + LINE_H
 			end
 		else
+			local iconValue = Setting("iconValue")
 			local perRow = math.max(1, math.floor((width - 8) / (size + 3)))
 			for index, item in ipairs(items) do
 				c = c + 1
@@ -893,6 +1024,23 @@ Render = function()
 				Font(button.count, math.max(9, math.floor(size * 0.4)))
 				button.count:SetTextColor(1, 1, 1)
 				button.count:SetText(item.count > 1 and item.count or "")
+				button.itemCount = item.count
+				local text, auction
+				if iconValue then
+					text, auction = ValueText(item.link, item.count, false)
+				end
+				if text then
+					Font(button.value, math.max(8, math.floor(size * 0.32)))
+					button.value:SetText(text)
+					if auction then
+						button.value:SetTextColor(1, 0.82, 0)
+					else
+						button.value:SetTextColor(0.6, 0.6, 0.6)
+					end
+				else
+					button.value:SetText("")
+				end
+				button.value:SetShown(text and true or false)
 				button:Show()
 			end
 			if #items > 0 then
