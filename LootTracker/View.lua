@@ -33,7 +33,9 @@ API.RegisterDefaults(S, {
 	valueShort = true,           -- those in short form (12g, 34s, 56c) instead of coins
 	valueFallback = true,        -- items without an auction price at vendor value, in gray
 	tooltipAuction = true,       -- item tooltip: auction price (each, and the stack), under Sell Price
-	tooltipScanAge = true,       -- item tooltip: how old the last scan is
+	tooltipAuctionStack = true,  -- item tooltip: the looted stack's auction price too (x4)
+	tooltipScanAge = true,
+	tooltipEverywhere = false,   -- those lines in every item tooltip (bags, links, ...), not only ours       -- item tooltip: how old the last scan is
 	-- Text: "global" (and size 0) follow Global Settings.
 	font = "global",
 	fontSize = 0,                -- 0: the tracker's own sizes; else the lines' size, the rest in step
@@ -488,32 +490,46 @@ local function AgeText(seconds)
 end
 
 -- The auction price in an item's tooltip, styled as the game's own Sell
--- Price line (SetTooltipMoney) and put right under it: a line post-call for
+-- Price line and put right under it: a line post-call for
 -- the Sell Price line, on tooltips of our item lines and icons only. An item
 -- the game shows no sell price for gets it at the end instead.
-local addedAuction
+local added = {} -- tooltips the lines went into while the game builds them
 
+-- A money line like the Sell Price one: the label in white, then the coins
+-- straight after it (as text with coin icons; a money frame of the game's
+-- set its coins apart from the label).
 local function MoneyLine(tooltip, label, copper)
-	if SetTooltipMoney then
-		SetTooltipMoney(tooltip, copper, nil, label)
-	else
-		tooltip:AddLine(label .. " " .. Money(copper), 1, 1, 1)
+	tooltip:AddLine(label .. " " .. Money(copper), 1, 1, 1)
+end
+
+-- The item a tooltip shows, and its count: our item lines and icons, or with
+-- Every Item Tooltip any item tooltip (one item: other tooltips' stacks are
+-- not ours to know).
+local function TooltipItem(tooltip)
+	local owner = tooltip.GetOwner and tooltip:GetOwner()
+	if type(owner) == "table" and owner.lootTrackerItem == true and type(owner.link) == "string" then
+		return owner.link, owner.itemCount or 1
+	end
+	if Setting("tooltipEverywhere") and tooltip.GetItem then
+		local ok, _, link = pcall(tooltip.GetItem, tooltip)
+		if ok and link and not API.IsSecret(link) then
+			return link, 1
+		end
 	end
 end
 
 local function AddAuctionLines(tooltip)
-	local owner = tooltip.GetOwner and tooltip:GetOwner()
-	if type(owner) ~= "table" or not owner.lootTrackerItem or not owner.link then
+	local link, count = TooltipItem(tooltip)
+	if not link then
 		return
 	end
-	addedAuction = true
-	local count = owner.itemCount or 1
-	local price = ns.AuctionPrice and ns.AuctionPrice(owner.link)
+	added[tooltip] = true
+	local price = ns.AuctionPrice and ns.AuctionPrice(link)
 	if not Setting("tooltipAuction") then
 		-- (Last scan's age alone, below.)
 	elseif price then
 		MoneyLine(tooltip, "Auction Price:", price)
-		if count > 1 then
+		if count > 1 and Setting("tooltipAuctionStack") then
 			MoneyLine(tooltip, ("Auction Price (x%d):"):format(count), price * count)
 		end
 	else
@@ -527,12 +543,26 @@ local function AddAuctionLines(tooltip)
 	end
 end
 
+local function OurTooltip(tooltip)
+	return tooltip == GameTooltip or tooltip == ItemRefTooltip
+end
+
+-- Right under the Sell Price line (a line post-call); an item the game shows
+-- no sell price for gets them at the end (the item tooltip's post-call).
+local hooked = false
 if TooltipDataProcessor and TooltipDataProcessor.AddLinePostCall and Enum and Enum.TooltipDataLineType and Enum.TooltipDataLineType.SellPrice then
-	pcall(TooltipDataProcessor.AddLinePostCall, Enum.TooltipDataLineType.SellPrice, function(tooltip)
-		if tooltip == GameTooltip then
+	hooked = pcall(TooltipDataProcessor.AddLinePostCall, Enum.TooltipDataLineType.SellPrice, function(tooltip)
+		if OurTooltip(tooltip) then
 			AddAuctionLines(tooltip)
 		end
-	end)
+	end) and TooltipDataProcessor.AddTooltipPostCall and Enum.TooltipDataType and Enum.TooltipDataType.Item and pcall(TooltipDataProcessor.AddTooltipPostCall, Enum.TooltipDataType.Item, function(tooltip)
+		if OurTooltip(tooltip) then
+			if not added[tooltip] then
+				AddAuctionLines(tooltip)
+			end
+			added[tooltip] = nil
+		end
+	end) or false
 end
 
 local function ShowItemTooltip(self)
@@ -541,11 +571,12 @@ local function ShowItemTooltip(self)
 	end
 	self.lootTrackerItem = true
 	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-	addedAuction = false
+	added[GameTooltip] = nil
 	GameTooltip:SetHyperlink(self.link)
-	if not addedAuction then
+	if not hooked and not added[GameTooltip] then
 		AddAuctionLines(GameTooltip)
 	end
+	added[GameTooltip] = nil
 	GameTooltip:Show()
 end
 
