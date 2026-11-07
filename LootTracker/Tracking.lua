@@ -10,7 +10,13 @@ local API = ns.API
 --   GameObject a resource node (the gathering casts, or a node ID below), or
 --              a chest; while IsFishingLoot(), fishing (a fishing school
 --              when it is not the bobber)
---   Item       a lockbox or other container you opened from your bags
+--   Item       a lockbox or other container you opened from your bags;
+--              after a Disenchant cast, a disenchanted item (one entry,
+--              "Disenchanted")
+-- With Only What You Receive (on), an item counts once the game says you
+-- received it (CHAT_MSG_LOOT: "You receive loot: ..."), so what someone else
+-- took, won the roll for or what you left behind is not counted; a roll you
+-- win later still goes to its source.
 -- Each loot is kept as an event (the newest LOG_LIMIT, for the
 -- Individualized view) and added into totals by source, so nothing is lost
 -- when old events go. Totals are kept fine-grained (kind, ID, zone, school);
@@ -275,6 +281,7 @@ local CASTS = {
 	{ "opening", "opening" },
 	{ "pick lock", "opening" },
 	{ "fishing", "fishing" },
+	{ "disenchant", "disenchant" },
 }
 
 local function SpellName(spellID)
@@ -432,6 +439,182 @@ local function Record(event)
 	Changed()
 end
 
+-- Only what you receive ------------------------------------------------------------
+-- Items from a loot window wait (by item ID, with their event) for the game's
+-- "You receive loot" line; a received line with no item waiting is kept a
+-- moment, for autoloot's lines that come before the window is read. A wait
+-- ends after PENDING_TIME (a roll can take a minute or two).
+
+local PENDING_TIME = 300
+local RECEIPT_TIME = 3
+local pending = {}  -- { id, item, event, left, until }
+local receipts = {} -- { id, count, until }
+-- While the game hides loot lines (secret text), bag counts stand in: what
+-- an item waiting for its line gains in the bags is what was received.
+local secretLines = false
+local baseline = {} -- item ID -> its count in the bags when it started waiting
+
+local function BagCount(id)
+	if C_Item and C_Item.GetItemCount then
+		return Plain(C_Item.GetItemCount(id)) or 0
+	end
+	return 0
+end
+
+-- The game's own "You receive ..." lines as patterns: the item's link, and
+-- the count when there is one.
+local SELF_LINES = {}
+for _, key in ipairs({ "LOOT_ITEM_SELF_MULTIPLE", "LOOT_ITEM_PUSHED_SELF_MULTIPLE", "LOOT_ITEM_SELF", "LOOT_ITEM_PUSHED_SELF" }) do
+	local text = _G[key]
+	if type(text) == "string" then
+		local pattern = text:gsub("([%(%)%.%%%+%-%*%?%[%]%^%$])", "%%%1"):gsub("%%%%s", "(.+)"):gsub("%%%%d", "(%%d+)")
+		SELF_LINES[#SELF_LINES + 1] = "^" .. pattern
+	end
+end
+
+ns.waiting = pending
+function ns.SecretLines()
+	return secretLines
+end
+
+function ns.Confirming()
+	return Setting("confirmLoot") and #SELF_LINES > 0
+end
+
+-- Adds a received item to its event and to the totals the event is in.
+local function AddReceived(event, item, count)
+	local got = {}
+	for k, v in pairs(item) do
+		got[k] = v
+	end
+	got.locked, got.count = nil, count
+	local items = { got }
+	-- An event's items are a list: the same item adds to its line.
+	local merged = false
+	for _, have in ipairs(event.items) do
+		if have.link == got.link then
+			have.count = have.count + count
+			merged = true
+			break
+		end
+	end
+	if not merged then
+		event.items[#event.items + 1] = got
+	end
+	for _, totals in ipairs({ db.totals, db.sessionTotals, (db.run and db.run.inside and db.run.id == event.run) and db.runTotals or nil }) do
+		local total = totals[TotalKey(event)]
+		if total then
+			AddItems(total.items, items, event.time)
+		end
+	end
+	Changed()
+end
+
+-- One received line: the oldest waiting item of that ID takes it.
+local function Receive(id, count)
+	local now = GetTime()
+	for i = 1, #pending do
+		local wait = pending[i]
+		if wait.id == id and wait["until"] >= now then
+			local take = math.min(count, wait.left)
+			AddReceived(wait.event, wait.item, take)
+			if baseline[id] then
+				baseline[id] = baseline[id] + take -- (the bags' count follows)
+			end
+			wait.left = wait.left - take
+			count = count - take
+			if wait.left <= 0 then
+				table.remove(pending, i)
+			end
+			break
+		end
+	end
+	return count
+end
+
+function ns.Await(event, item)
+	local id = ItemID(item.link)
+	if not id then
+		return
+	end
+	local now = GetTime()
+	pending[#pending + 1] = { id = id, item = item, event = event, left = item.count or 1, ["until"] = now + PENDING_TIME }
+	if not baseline[id] then
+		baseline[id] = BagCount(id)
+	end
+	-- A line that came first (autoloot).
+	for i = #receipts, 1, -1 do
+		local receipt = receipts[i]
+		if receipt["until"] < now then
+			table.remove(receipts, i)
+		elseif receipt.id == id then
+			receipt.count = Receive(id, receipt.count)
+			if receipt.count <= 0 then
+				table.remove(receipts, i)
+			end
+		end
+	end
+end
+
+local function DropExpired()
+	local now, waiting = GetTime(), {}
+	for i = #pending, 1, -1 do
+		if pending[i]["until"] < now then
+			table.remove(pending, i)
+		else
+			waiting[pending[i].id] = true
+		end
+	end
+	for id in pairs(baseline) do
+		if not waiting[id] then
+			baseline[id] = nil
+		end
+	end
+end
+
+API.On("BAG_UPDATE_DELAYED", function()
+	if not db or not secretLines or not ns.Confirming() then
+		return
+	end
+	DropExpired()
+	for id, before in pairs(baseline) do
+		local now = BagCount(id)
+		if now > before then
+			Receive(id, now - before)
+		end
+		baseline[id] = now
+	end
+end)
+
+API.On("CHAT_MSG_LOOT", function(_, text)
+	if not db or not ns.Confirming() then
+		return
+	end
+	if API.IsSecret(text) then
+		secretLines = true
+		return
+	end
+	if type(text) ~= "string" then
+		return
+	end
+	secretLines = false
+	for _, pattern in ipairs(SELF_LINES) do
+		local link, count = text:match(pattern)
+		if link then
+			local id = ItemID(link)
+			count = tonumber(count) or 1
+			if id then
+				DropExpired()
+				local left = Receive(id, count)
+				if left > 0 then
+					receipts[#receipts + 1] = { id = id, count = left, ["until"] = GetTime() + RECEIPT_TIME }
+				end
+			end
+			return
+		end
+	end
+end)
+
 -- Sources already recorded this session (a corpse opened twice, a chest
 -- left half looted), by kind and GUID.
 local recorded = {}
@@ -498,7 +681,14 @@ local function Classify(guid, fishing, cast)
 			RememberObject(id, name)
 		end
 		return "chest", id, name or ("Chest " .. tostring(id))
-	elseif unitType == "Item" then
+	elseif unitType == "Item" or cast == "disenchant" then
+		-- A disenchanted item: every disenchant in one entry.
+		if cast == "disenchant" then
+			if not Setting("trackDisenchant") then
+				return nil
+			end
+			return "disenchant", 0, "Disenchanted"
+		end
 		if not Setting("trackLockboxes") then
 			return nil
 		end
@@ -549,7 +739,8 @@ local function OnLootOpened()
 	end
 	for slot = 1, GetNumLootItems() do
 		local slotType = GetLootSlotType(slot)
-		local icon, name, quantity, _, quality = GetLootSlotInfo(slot)
+		local icon, name, quantity, _, quality, locked = GetLootSlotInfo(slot)
+		locked = Plain(locked) and true or false
 		local link = GetLootSlotLink(slot)
 		local sources = { GetLootSourceInfo(slot) }
 		if #sources == 0 then
@@ -566,6 +757,7 @@ local function OnLootOpened()
 					bucket.items[#bucket.items + 1] = {
 						link = link, name = Plain(name), icon = icon, quality = Plain(quality),
 						count = (#sources > 2 and amount) or quantity or 1,
+						locked = locked,
 					}
 				end
 			end
@@ -585,11 +777,20 @@ local function OnLootOpened()
 		if kind and (guid == "Fishing" or not recorded[seenKey]) then
 			recorded[seenKey] = true
 			local bucket = buckets[guid]
-			Record({
+			local items, waiting = bucket.items, nil
+			if ns.Confirming() then
+				-- Items wait for the game to say you received them.
+				items, waiting = {}, bucket.items
+			end
+			local event = {
 				kind = kind, id = id, name = sourceName, school = school,
 				zone = kind == "fishing" and Zone() or nil,
-				money = bucket.money, items = bucket.items, time = now,
-			})
+				money = bucket.money, items = items, time = now,
+			}
+			Record(event)
+			for _, item in ipairs(waiting or {}) do
+				ns.Await(event, item)
+			end
 		end
 	end
 	lastCast = nil
@@ -759,6 +960,8 @@ API.RegisterProbe(function()
 	for _ in pairs(nameDB and nameDB.pending or {}) do pending = pending + 1 end
 	local objects = 0
 	for _ in pairs(nameDB and nameDB.objects or {}) do objects = objects + 1 end
+	API.Print(("Loot Tracker: only what you receive %s: %d loot line patterns, %d items waiting, loot lines %s"):format(
+		ns.Confirming() and "on" or "off", #SELF_LINES, #ns.waiting, ns.SecretLines() and "SECRET (bag counts stand in)" or "readable"))
 	API.Print(("Loot Tracker: world objects: %d named; softinteract unit %s"):format(objects, (UnitExists and UnitExists("softinteract")) and "now" or "none now"))
 	API.Print(("Loot Tracker: names: %d known, %d looted in instances, %d waiting; C_TooltipInfo.GetHyperlink %s"):format(
 		named, instanced, pending, (C_TooltipInfo and C_TooltipInfo.GetHyperlink) and "yes" or "MISSING"))

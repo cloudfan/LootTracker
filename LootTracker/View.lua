@@ -20,6 +20,8 @@ API.RegisterDefaults(S, {
 	pickpocketMerge = false,     -- pickpocketing loot in the creature's own entry
 	trackChests = true,
 	trackLockboxes = true,
+	trackDisenchant = true,      -- disenchanting's loot, in one "Disenchanted" entry
+	confirmLoot = true,          -- an item counts once the game says you received it
 	trackNodes = true,
 	trackFishing = true,
 	fishingGrouping = "zone",    -- "zone" (all of a zone's fishing) or "separated" (schools by type)
@@ -590,6 +592,7 @@ local PORTRAIT_ICONS = {
 	skinning = [[Interface\Icons\INV_Misc_Pelt_Wolf_01]],
 	pickpocket = [[Interface\Icons\INV_Misc_Bag_11]],
 	lockbox = [[Interface\Icons\INV_Misc_OrnateBox]],
+	disenchant = [[Interface\Icons\INV_Enchant_Disenchant]],
 	creature = [[Interface\Icons\INV_Misc_QuestionMark]],
 }
 
