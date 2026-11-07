@@ -25,7 +25,9 @@ API.RegisterDefaults(S, {
 	fishingGrouping = "zone",    -- "zone" (all of a zone's fishing) or "separated" (schools by type)
 	-- View
 	itemValue = "vendor",        -- "vendor", "auction" (the last scan's lowest buyout) or "none"
-	auctionAutoScan = true,      -- scan when the auction house opens (with Auction Value)
+	auctionAutoScan = false,     -- a full scan when the auction house opens (it can stall the game a moment)
+	auctionBrowse = true,        -- browsing the auction house updates the prices it shows
+	auctionButton = true,        -- a Scan button on the auction house's Buy page
 	-- Per-item auction value, each a toggle.
 	lineValue = true,            -- List view: each line's stack at its auction price
 	lineValueEach = false,       -- List view: one item's auction price on each line
@@ -536,9 +538,10 @@ local function AddAuctionLines(tooltip)
 		tooltip:AddLine("Auction Price: |cff999999" .. (ns.ScanInfo and ns.ScanInfo() and "not listed" or "no scan yet") .. "|r", 1, 1, 1)
 	end
 	if Setting("tooltipScanAge") and ns.ScanInfo then
-		local scanned = ns.ScanInfo()
-		if scanned then
-			tooltip:AddLine("Last scan: " .. AgeText(math.max(0, time() - scanned)), 0.6, 0.6, 0.6)
+		-- The price's own age (browsing sees items one by one), else the scan's.
+		local seen = price and ns.AuctionTime and ns.AuctionTime(link) or ns.ScanInfo()
+		if seen then
+			tooltip:AddLine((price and "Price seen: " or "Last scan: ") .. AgeText(math.max(0, time() - seen)), 0.6, 0.6, 0.6)
 		end
 	end
 end

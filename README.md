@@ -26,7 +26,9 @@ Options > AddOns > Loot Tracker, or `/loot`.
 | Tracking | Export, Export Name Database, Reset All Loot | | A copy box of the entries; of the learned names; forget everything (asks first). |
 | View | Item Value | Vendor Value | Vendor Value, Auction Value or None. |
 | View | View | List | List or Icons. |
-| View | Scan when the auction house opens, Scan Now | On | The auction scan for Auction Value. |
+| View | Update prices while browsing | On | Every item the auction house's Buy page shows, and the listings you open, update its price, with no full scan. |
+| View | Scan button on the Buy page | On | A Scan AH button by the auction house's Search button, counting down the game's 15 minutes between scans. |
+| View | Scan when the auction house opens, Scan Now | Off | A full scan when you open the auction house (it can stall the game a moment), or now. |
 | View | Stack value on item lines | On | List view: each stack's auction value beside its count (gray: vendor value, with Vendor Fallback). |
 | View | Price each on item lines | Off | List view: one item's auction price beside its count. |
 | View | Stack value on item icons | Off | Icons view: the stack's auction value on each icon. |
@@ -34,7 +36,7 @@ Options > AddOns > Loot Tracker, or `/loot`.
 | View | Vendor Fallback | On | Items with no auction price show their vendor price, in gray. |
 | View | Auction price in item tooltips | On | An item's tooltip: its auction price right under the game's Sell Price, in the same style, or "not listed". |
 | View | Stack's auction price in item tooltips | On | A second tooltip line with the looted stack's auction price (Auction Price (x4)), for stacks of more than one. |
-| View | Last scan's age in item tooltips | On | An item's tooltip: how long ago the auction house was scanned. |
+| View | Price's age in item tooltips | On | An item's tooltip: how long ago its auction price was seen (browsing or a full scan). |
 | View | In every item tooltip | Off | The auction price and last scan's age in every item tooltip (bags, links, the bank, vendors), not only the tracker's; outside the tracker, the price of one item. |
 | View | Item Sort, Source Sort | Quality, Newest | Quality / Newest / Value; Newest / Value. |
 | View | Item icons in the list, Icon Size | On, 28 | |
