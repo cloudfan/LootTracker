@@ -16,7 +16,8 @@ local API = ns.API
 -- With Only What You Receive (on), an item counts once the game says you
 -- received it (CHAT_MSG_LOOT: "You receive loot: ..."), so what someone else
 -- took, won the roll for or what you left behind is not counted; a roll you
--- win later still goes to its source.
+-- win later still goes to its source. Gold counts as your purse grows: your
+-- share in a group.
 -- Each loot is kept as an event (the newest LOG_LIMIT, for the
 -- Individualized view) and added into totals by source, so nothing is lost
 -- when old events go. Totals are kept fine-grained (kind, ID, zone, school);
@@ -572,6 +573,70 @@ local function DropExpired()
 	end
 end
 
+-- Gold: what the purse gains (GetMoney, on PLAYER_MONEY) goes to the gold
+-- waiting, oldest first, up to what each corpse showed: your share in a
+-- group, nothing for what someone else took. A gain with nothing waiting is
+-- kept a moment (autoloot can take it before the window is read).
+local MONEY_TIME = 15
+local moneyWaits = {}   -- { event, left, until }
+local moneyReceipt = { amount = 0, ["until"] = 0 }
+local purse = GetMoney and Plain(GetMoney()) or nil
+
+local function AddMoney(event, copper)
+	event.money = (event.money or 0) + copper
+	for _, totals in ipairs({ db.totals, db.sessionTotals, (db.run and db.run.inside and db.run.id == event.run) and db.runTotals or nil }) do
+		local total = totals[TotalKey(event)]
+		if total then
+			total.money = total.money + copper
+		end
+	end
+	Changed()
+end
+
+local function GiveMoney(amount)
+	local now = GetTime()
+	local i = 1
+	while amount > 0 and i <= #moneyWaits do
+		local wait = moneyWaits[i]
+		if wait["until"] < now then
+			table.remove(moneyWaits, i)
+		else
+			local take = math.min(amount, wait.left)
+			AddMoney(wait.event, take)
+			amount = amount - take
+			wait.left = wait.left - take
+			-- In a group the share is less than the corpse showed: one gain
+			-- settles a corpse.
+			table.remove(moneyWaits, i)
+		end
+	end
+	return amount
+end
+
+function ns.AwaitMoney(event, copper)
+	moneyWaits[#moneyWaits + 1] = { event = event, left = copper, ["until"] = GetTime() + MONEY_TIME }
+	if moneyReceipt.amount > 0 and moneyReceipt["until"] >= GetTime() then
+		moneyReceipt.amount = GiveMoney(moneyReceipt.amount)
+	end
+end
+
+API.On("PLAYER_MONEY", function()
+	local now = GetMoney and Plain(GetMoney())
+	if not now then
+		return
+	end
+	local gained = purse and (now - purse) or 0
+	purse = now
+	if gained > 0 and db and ns.Confirming() then
+		local left = GiveMoney(gained)
+		moneyReceipt = { amount = left, ["until"] = GetTime() + RECEIPT_TIME }
+	end
+end)
+
+API.On("PLAYER_ENTERING_WORLD", function()
+	purse = GetMoney and Plain(GetMoney()) or purse
+end)
+
 API.On("BAG_UPDATE_DELAYED", function()
 	if not db or not secretLines or not ns.Confirming() then
 		return
@@ -777,19 +842,23 @@ local function OnLootOpened()
 		if kind and (guid == "Fishing" or not recorded[seenKey]) then
 			recorded[seenKey] = true
 			local bucket = buckets[guid]
-			local items, waiting = bucket.items, nil
+			local items, waiting, money = bucket.items, nil, bucket.money
 			if ns.Confirming() then
-				-- Items wait for the game to say you received them.
-				items, waiting = {}, bucket.items
+				-- Items and gold wait for the game to say you received them
+				-- (your share of the gold, in a group).
+				items, waiting, money = {}, bucket.items, 0
 			end
 			local event = {
 				kind = kind, id = id, name = sourceName, school = school,
 				zone = kind == "fishing" and Zone() or nil,
-				money = bucket.money, items = items, time = now,
+				money = money, items = items, time = now,
 			}
 			Record(event)
 			for _, item in ipairs(waiting or {}) do
 				ns.Await(event, item)
+			end
+			if waiting and bucket.money > 0 then
+				ns.AwaitMoney(event, bucket.money)
 			end
 		end
 	end

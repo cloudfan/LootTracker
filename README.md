@@ -21,7 +21,7 @@ Options > AddOns > Loot Tracker, or `/loot`.
 | Tracking | Grouping | Grouped | Grouped (merged by ID) or Individualized (each loot, the last 300). |
 | Tracking | Show | All Time | All Time, This Session (since login) or This Instance (the current run). Also in the title's menu. |
 | Tracking | Creatures, Chests, Lockboxes, Disenchanting, Resource Nodes, Fishing | On | What is tracked. Disenchanting's loot goes into one entry, Disenchanted. |
-| Tracking | Only What You Receive | On | An item counts only once the game says you received it: in a group, what someone else takes or wins the roll for, and what you leave behind, is not counted; a roll you win counts for its source. Where the game hides those lines, your bag counts stand in. |
+| Tracking | Only What You Receive | On | An item counts only once the game says you received it: in a group, what someone else takes or wins the roll for, and what you leave behind, is not counted; a roll you win counts for its source. Where the game hides those lines, your bag counts stand in. Gold counts as your purse grows: your share in a group. |
 | Tracking | Merge Skinning, Merge Pickpocketing | Off | Into the creature's entry instead of their own. |
 | Tracking | Fishing Grouping | By Zone | By Zone, or Separated (schools by type). |
 | Tracking | Export, Export Name Database, Reset All Loot | | A copy box of the entries; of the learned names; forget everything (asks first). |

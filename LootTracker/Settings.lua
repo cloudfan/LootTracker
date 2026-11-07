@@ -329,7 +329,7 @@ Checkbox(1, "Lockboxes", "trackLockboxes", "Lockboxes and other containers you o
 Checkbox(2, "Resource Nodes", "trackNodes", "Mining and herbalism. Copper Vein and Poor Copper Vein share one entry, as do Peacebloom and Wilted Peacebloom.")
 EndRow()
 Checkbox(1, "Disenchanting", "trackDisenchant", "What disenchanting gives you, all in one entry: Disenchanted.")
-Checkbox(2, "Only What You Receive", "confirmLoot", "An item counts only once the game says you received it (\"You receive loot: ...\"). In a group, what someone else takes or wins the roll for, and what you leave behind, is not counted; a roll you win counts for its source when it comes. Off: everything the loot window shows counts when it opens.")
+Checkbox(2, "Only What You Receive", "confirmLoot", "An item counts only once the game says you received it (\"You receive loot: ...\"). In a group, what someone else takes or wins the roll for, and what you leave behind, is not counted; a roll you win counts for its source when it comes. Gold counts as your purse grows: your share in a group. Off: everything the loot window shows counts when it opens.")
 EndRow()
 Checkbox(1, "Fishing", "trackFishing")
 Dropdown(2, "Fishing Grouping", "fishingGrouping", Items({
