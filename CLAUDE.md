@@ -5,7 +5,7 @@ A World of Warcraft: Forever addon (`## Interface: 16001`, Lua 5.1). Standalone:
 ## Layout
 
 - `LootTracker/Core.lua`: `ns.API`, the framework calls those files make, written for this addon alone: settings by section (`RegisterDefaults`, `Get` / `Set`, `ClearSection`; only changed values kept, in `LootTrackerSettings`), events (`On`, one frame) and messages (`Listen` / `Fire`), `OnReady`, `Print`, `IsSecret` / `Plain`, colors (`ResolveColor`, color settings `{ preset = ... }`), media through LibSharedMedia (`API.LSM`; `MediaList` is its list, `Fetch` its file; the game's own fonts, bar textures and backgrounds in `MEDIA` are registered into it where it lacks their file, and still resolve by our names; with no LSM, `MEDIA` alone; `ApplyFont`), a bordered panel (`CreateInsetBorder`: a tooltip-style backdrop), dragging (`RegisterMover` / `RefreshMover`: a handle over the frame while unlocked, `SetUnlocked`, positions in the `positions` section), `NewScrollBar` (Pillars UI's) and `ShowCopyBox`. Pillars UI-only calls (`RegisterAnchor`, `RegisterBoxPanel`, `IsModuleLoaded`) do nothing, so the Data Box placement never applies.
-- `LootTracker/Settings.lua`: the settings, a canvas panel in Blizzard's options (`Settings.RegisterCanvasLayoutCategory`, else `InterfaceOptions_AddCategory`) with controls of our own, in a scroll frame; `/loot`.
+- `LootTracker/Settings.lua`: the settings, a canvas panel in Blizzard's options (`Settings.RegisterCanvasLayoutCategory`, else `InterfaceOptions_AddCategory`) with controls of our own, in a scroll frame; `/lt` and `/loottracker` (the game keeps `/loot` for its own loot window).
 - `LootTracker/Media/PortraitRing.tga`: Pillars UI's portrait ring.
 
 ## Rules

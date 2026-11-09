@@ -1200,7 +1200,7 @@ local function PlaceToggle()
 end
 
 local function Apply()
-	-- Unlocked (/loot unlock): shown, even folded away, so it can be dragged.
+	-- Unlocked (/lt unlock): shown, even folded away, so it can be dragged.
 	previewing = not API.Get("loot", "locked")
 	if ns.standingDown then
 		panel:Hide()

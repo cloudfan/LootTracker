@@ -8,13 +8,13 @@ What you loot and from what, for World of Warcraft: Forever (`## Interface: 1600
 - **Names:** creatures and world objects are named by ID, account-wide, even when the game hides names in an instance; hovering a source shows its NPC, object or item ID.
 - **Per entry:** a click on a source folds its loot; its X deletes it.
 - **Menu (the arrow by the title):** track this session or this instance only, export to a box to copy, export the name database, reset all.
-- **Frame:** its own, with an arrow beside it that hides it and pops it out. `/loot unlock` to drag it, `/loot lock` after.
+- **Frame:** its own, with an arrow beside it that hides it and pops it out. `/lt unlock` to drag it, `/lt lock` after.
 
 Data is kept per character (`LootTrackerDB`: the last 300 loots, and totals that never drop); names and auction prices are account-wide (`LootTrackerNames`, `LootTrackerPrices`), settings too (`LootTrackerSettings`).
 
 ## Settings
 
-Options > AddOns > Loot Tracker, or `/loot`.
+Options > AddOns > Loot Tracker, or `/lt`.
 
 | Section | Setting | Default | What it does |
 |---|---|---|---|
@@ -50,7 +50,7 @@ Options > AddOns > Loot Tracker, or `/loot`.
 | Background Bars | Line Bar Length, Line Bar Opacity | Full Width, 25% | Full Width or By Count. |
 | Text | Font, Text Shadow | Friz Quadrata, Soft | Any SharedMedia font; None, Soft, Outline, Thick Outline. |
 | Text | Text Size | Auto | 0 (Auto) to 24. |
-| Frame | Unlock (drag it) | Off | Also `/loot unlock`. |
+| Frame | Unlock (drag it) | Off | Also `/lt unlock`. |
 | Frame | Arrow Side | Right | |
 | Frame | Width, Height | 260, 320 | |
 | Frame | Border, Background, Background Opacity | On, Solid, 80% | Any SharedMedia background. |
@@ -58,12 +58,12 @@ Options > AddOns > Loot Tracker, or `/loot`.
 
 ## Slash commands
 
-- `/loot` or `/loottracker`: settings.
-- `/loot show`, `/loot hide`, `/loot toggle`: the tracker.
-- `/loot unlock`, `/loot lock`: drag it, then lock it.
-- `/loot export`: the entries in a copy box.
-- `/loot scan`: scan the auction house (it must be open).
-- `/loot probe`: what this client offers, in a copy box.
+- `/lt` or `/loottracker`: settings.
+- `/lt show`, `/lt hide`, `/lt toggle`: the tracker.
+- `/lt unlock`, `/lt lock`: drag it, then lock it.
+- `/lt export`: the entries in a copy box.
+- `/lt scan`: scan the auction house (it must be open).
+- `/lt probe`: what this client offers, in a copy box.
 
 ## Install
 

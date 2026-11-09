@@ -358,7 +358,7 @@ function API.CreateInsetBorder(parent)
 	return border
 end
 
--- Moving the frame: while unlocked (/loot unlock), a handle over it drags it;
+-- Moving the frame: while unlocked (/lt unlock), a handle over it drags it;
 -- its place is kept in the positions section.
 
 local movers = {}
@@ -375,7 +375,7 @@ function API.RegisterMover(frame, key, label, default, active)
 	fill:SetColorTexture(API.BRONZE[1], API.BRONZE[2], API.BRONZE[3], 0.25)
 	local text = mover:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 	text:SetPoint("CENTER")
-	text:SetText(label .. "\n|cffaaaaaadrag, then /loot lock|r")
+	text:SetText(label .. "\n|cffaaaaaadrag, then /lt lock|r")
 	frame:SetMovable(true)
 	frame:SetClampedToScreen(true)
 	mover:SetScript("OnDragStart", function()

@@ -3,7 +3,7 @@ local API = ns.API
 
 -- Loot Tracker's settings, in Blizzard's Options > AddOns (a canvas panel:
 -- Settings.RegisterCanvasLayoutCategory, or the older Interface Options),
--- with simple controls of our own so they work on any client. /loot opens it.
+-- with simple controls of our own so they work on any client. /lt opens it.
 
 local S = "lootTracker"
 
@@ -306,7 +306,7 @@ local function NotList()
 end
 
 Header("Loot Tracker", true)
-Note("What you loot and from what: creatures (a kill is a corpse you looted), their skinning and pickpocketing, chests, lockboxes, resource nodes and fishing. Gold is shown beside each source's name, with its items' value if you like. Kept per character. /loot opens this page, /loot unlock lets you drag the tracker.")
+Note("What you loot and from what: creatures (a kill is a corpse you looted), their skinning and pickpocketing, chests, lockboxes, resource nodes and fishing. Gold is shown beside each source's name, with its items' value if you like. Kept per character. /lt opens this page, /lt unlock lets you drag the tracker.")
 
 Header("Tracking")
 Dropdown(1, "Grouping", "grouping", Items({
@@ -439,7 +439,7 @@ end, nil, "The item lines' size; names, money and the title follow in step. All 
 EndRow()
 
 Header("Frame")
-Checkbox(1, "Unlock (drag it)", nil, "While unlocked the tracker shows (even folded away) and can be dragged. Also /loot unlock and /loot lock.", nil, function()
+Checkbox(1, "Unlock (drag it)", nil, "While unlocked the tracker shows (even folded away) and can be dragged. Also /lt unlock and /lt lock.", nil, function()
 	return not API.Get("loot", "locked")
 end, function(on)
 	API.SetUnlocked(on)
@@ -510,13 +510,13 @@ end
 
 -- Slash command ----------------------------------------------------------------------
 
-SLASH_LOOTTRACKER1 = "/loot"
+SLASH_LOOTTRACKER1 = "/lt"
 SLASH_LOOTTRACKER2 = "/loottracker"
 SlashCmdList.LOOTTRACKER = function(msg)
 	local command = strlower(strtrim(msg or ""))
 	if command == "unlock" or command == "lock" then
 		API.SetUnlocked(command == "unlock")
-		API.Print(command == "lock" and "locked." or "unlocked: drag the tracker, then /loot lock.")
+		API.Print(command == "lock" and "locked." or "unlocked: drag the tracker, then /lt lock.")
 	elseif command == "show" or command == "hide" or command == "toggle" then
 		local collapsed = command == "hide" or (command == "toggle" and not Get("collapsed"))
 		Set("collapsed", collapsed)
