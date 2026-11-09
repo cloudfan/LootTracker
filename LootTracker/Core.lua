@@ -127,8 +127,12 @@ events:SetScript("OnEvent", function(_, event, ...)
 	if event ~= "ADDON_LOADED" and PillarsModuleOn() then
 		return
 	end
+	-- One handler's error is reported and the rest still run.
 	for _, fn in ipairs(handlers[event] or {}) do
-		fn(event, ...)
+		local ok, err = pcall(fn, event, ...)
+		if not ok then
+			geterrorhandler()(err)
+		end
 	end
 	if event == "ADDON_LOADED" and (...) == addonName then
 		local list = ready

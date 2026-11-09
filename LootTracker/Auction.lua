@@ -511,3 +511,13 @@ API.OnReady(function()
 		ns.CreateScanButton()
 	end
 end)
+
+-- Blizzard showing its auction house panel tells us too, whatever events
+-- this client sends.
+if type(ShowUIPanel) == "function" then
+	hooksecurefunc("ShowUIPanel", function(frame)
+		if frame ~= nil and (frame == AuctionHouseFrame or frame == AuctionFrame) then
+			Opened()
+		end
+	end)
+end
