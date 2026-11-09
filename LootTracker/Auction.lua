@@ -419,9 +419,12 @@ function ns.CreateScanButton()
 		frame, bar, anchor = AuctionFrame, AuctionFrameBrowse, BrowseSearchButton
 	end
 	if not frame then
-		buttonWhy = "no auction house window (AuctionHouseFrame) yet"
+		buttonWhy = "no auction house window yet (neither AuctionHouseFrame nor AuctionFrame)"
 		return
 	end
+	-- Its own showing and hiding tell us too, where the game's events do not.
+	frame:HookScript("OnShow", Opened)
+	frame:HookScript("OnHide", Closed)
 	-- A holder of ours over the window watches which page shows.
 	local holder = CreateFrame("Frame", nil, frame)
 	holder:SetAllPoints()
@@ -500,4 +503,11 @@ API.RegisterProbe(function()
 		ns.ScanButtonState(),
 		seenCount,
 		scanned and (date("%Y-%m-%d %H:%M", scanned) .. ", " .. items .. " prices") or "never")
+end)
+
+-- Already loaded (another addon loaded it first).
+API.OnReady(function()
+	if AuctionHouseFrame or AuctionFrame then
+		ns.CreateScanButton()
+	end
 end)
