@@ -104,7 +104,9 @@ end
 function API.On(event, fn)
 	if not handlers[event] then
 		handlers[event] = {}
-		events:RegisterEvent(event)
+		-- An event this client does not have is skipped (registering it is
+		-- an error that would stop the rest of the file).
+		pcall(events.RegisterEvent, events, event)
 	end
 	table.insert(handlers[event], fn)
 end
