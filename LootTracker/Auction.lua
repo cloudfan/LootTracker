@@ -202,10 +202,18 @@ API.On("REPLICATE_ITEM_LIST_UPDATE", function()
 	Read()
 end)
 
-API.On("AUCTION_HOUSE_SHOW", function()
+local function Opened()
+	if atAuctionHouse then
+		ns.CreateScanButton()
+		return
+	end
 	atAuctionHouse = true
 	API.Fire("LootTrackerScan")
+	-- Blizzard's auction house window may only now be loading: try again
+	-- after it has.
 	ns.CreateScanButton()
+	C_Timer.After(0, ns.CreateScanButton)
+	C_Timer.After(0.5, ns.CreateScanButton)
 	if Setting("auctionAutoScan") then
 		C_Timer.After(1, function()
 			if ns.ScanState() == "ready" then
@@ -213,11 +221,34 @@ API.On("AUCTION_HOUSE_SHOW", function()
 			end
 		end)
 	end
-end)
+end
 
-API.On("AUCTION_HOUSE_CLOSED", function()
-	atAuctionHouse = false
-	API.Fire("LootTrackerScan")
+local function Closed()
+	if atAuctionHouse then
+		atAuctionHouse = false
+		API.Fire("LootTrackerScan")
+	end
+end
+
+local AUCTIONEER = Enum and Enum.PlayerInteractionType and Enum.PlayerInteractionType.Auctioneer
+
+API.On("AUCTION_HOUSE_SHOW", Opened)
+API.On("AUCTION_HOUSE_CLOSED", Closed)
+-- The interaction manager's events, which newer clients send instead.
+API.On("PLAYER_INTERACTION_MANAGER_FRAME_SHOW", function(_, kind)
+	if AUCTIONEER and kind == AUCTIONEER then
+		Opened()
+	end
+end)
+API.On("PLAYER_INTERACTION_MANAGER_FRAME_HIDE", function(_, kind)
+	if AUCTIONEER and kind == AUCTIONEER then
+		Closed()
+	end
+end)
+API.On("ADDON_LOADED", function(_, name)
+	if name == "Blizzard_AuctionHouseUI" or name == "Blizzard_AuctionUI" then
+		C_Timer.After(0, ns.CreateScanButton)
+	end
 end)
 
 -- Browsing ----------------------------------------------------------------------------
@@ -362,32 +393,61 @@ local function UpdateScanButton()
 	end
 end
 
--- Made when the auction house first opens (its UI loads on demand): a child
--- of the Buy page's search bar, so it shows only there, left of its Search
--- button; or above the older browse frame's Search button.
+-- Made when the auction house first opens (its window loads on demand): a
+-- child of Blizzard's auction house window, left of the Buy page's Search
+-- button, shown while the Buy page's search bar is; on the older auction
+-- house, above its browse tab's Search button.
+local buttonWhy = "the auction house has not opened yet"
+
 function ns.CreateScanButton()
-	if scanButton or not Setting("auctionButton") then
+	if not Setting("auctionButton") then
+		buttonWhy = "turned off"
+		if scanButton then
+			scanButton:Hide()
+		end
+		return
+	end
+	if scanButton then
 		UpdateScanButton()
 		return
 	end
-	local bar = AuctionHouseFrame and AuctionHouseFrame.SearchBar
-	local parent, anchor = bar, bar and bar.SearchButton
-	if not parent and AuctionFrameBrowse then
-		parent, anchor = AuctionFrameBrowse, BrowseSearchButton
+	local frame, bar, anchor = AuctionHouseFrame, nil, nil
+	if frame then
+		bar = frame.SearchBar
+		anchor = bar and bar.SearchButton
+	elseif AuctionFrame then
+		frame, bar, anchor = AuctionFrame, AuctionFrameBrowse, BrowseSearchButton
 	end
-	if not parent or not Available() then
+	if not frame then
+		buttonWhy = "no auction house window (AuctionHouseFrame) yet"
 		return
 	end
-	scanButton = CreateFrame("Button", "LootTrackerScanButton", parent, "UIPanelButtonTemplate")
+	-- A holder of ours over the window watches which page shows.
+	local holder = CreateFrame("Frame", nil, frame)
+	holder:SetAllPoints()
+	holder:SetFrameLevel(frame:GetFrameLevel() + 20)
+	scanButton = CreateFrame("Button", "LootTrackerScanButton", holder, "UIPanelButtonTemplate")
 	scanButton:SetSize(96, 22)
-	if anchor and parent == bar then
+	if anchor and frame == AuctionHouseFrame then
 		scanButton:SetPoint("RIGHT", anchor, "LEFT", -6, 0)
 	elseif anchor then
 		scanButton:SetPoint("BOTTOM", anchor, "TOP", 0, 4)
+	elseif bar then
+		scanButton:SetPoint("RIGHT", bar, "RIGHT", -110, 0)
 	else
-		scanButton:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -60, -40)
+		scanButton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -40, -30)
 	end
-	scanButton:SetFrameLevel(parent:GetFrameLevel() + 5)
+	local seen = 0
+	holder:SetScript("OnUpdate", function(_, elapsed)
+		seen = seen + elapsed
+		if seen < 0.2 then
+			return
+		end
+		seen = 0
+		local wanted = Setting("auctionButton") and (not bar or bar:IsVisible())
+		scanButton:SetShown(wanted and true or false)
+	end)
+	buttonWhy = nil
 	scanButton:SetScript("OnClick", function()
 		ns.Scan()
 	end)
@@ -395,6 +455,9 @@ function ns.CreateScanButton()
 		GameTooltip:SetOwner(self, "ANCHOR_TOP")
 		GameTooltip_SetTitle(GameTooltip, "Loot Tracker: Scan the Auction House")
 		GameTooltip_AddNormalLine(GameTooltip, "Reads every auction on the realm for the lowest price of each item (the game allows one scan every 15 minutes).")
+		if ns.ScanState() == "unavailable" then
+			GameTooltip_AddErrorLine(GameTooltip, "This game build has no full auction house scan (C_AuctionHouse.ReplicateItems); browsing still updates prices.")
+		end
 		local scanned, items = ns.ScanInfo()
 		if scanned then
 			GameTooltip_AddHighlightLine(GameTooltip, ("Prices for %d items; last full scan %s."):format(items, date("%Y-%m-%d %H:%M", scanned)))
@@ -416,19 +479,25 @@ end
 
 API.Listen("LootTrackerScan", UpdateScanButton)
 API.Listen("SettingChanged", function(section, key)
-	if section == S and key == "auctionButton" and scanButton then
-		scanButton:SetShown(Setting("auctionButton") and true or false)
-	elseif section == S and key == "auctionButton" and atAuctionHouse then
+	if section == S and key == "auctionButton" then
 		ns.CreateScanButton()
 	end
 end)
 
+function ns.ScanButtonState()
+	if scanButton then
+		return ("made on %s, %s"):format(AuctionHouseFrame and "AuctionHouseFrame" or "AuctionFrame", scanButton:IsVisible() and "showing" or "not showing now")
+	end
+	return "not made: " .. (buttonWhy or "?")
+end
+
 API.RegisterProbe(function()
 	local scanned, items = ns.ScanInfo()
-	return "Loot Tracker: auctions", ("ReplicateItems %s, GetReplicateItemInfo %s, browse %s, %d prices from browsing this session, last scan %s"):format(
+	return "Loot Tracker: auctions", ("ReplicateItems %s, GetReplicateItemInfo %s, browse %s, scan button %s, %d prices from browsing this session, last scan %s"):format(
 		(C_AuctionHouse and C_AuctionHouse.ReplicateItems) and "yes" or "MISSING",
 		(C_AuctionHouse and C_AuctionHouse.GetReplicateItemInfo) and "yes" or "MISSING",
 		(C_AuctionHouse and C_AuctionHouse.GetBrowseResults) and "modern" or GetAuctionItemInfo and "classic" or "MISSING",
+		ns.ScanButtonState(),
 		seenCount,
 		scanned and (date("%Y-%m-%d %H:%M", scanned) .. ", " .. items .. " prices") or "never")
 end)
