@@ -28,7 +28,7 @@ Options > AddOns > Loot Tracker, or `/lt`.
 | View | Item Value | Vendor Value | Vendor Value, Auction Value or None. |
 | View | View | List | List or Icons. |
 | View | Update prices while browsing | On | Every item the auction house's Buy page shows, and the listings you open, update its price, with no full scan. |
-| View | Scan button on the Buy page | On | A Scan AH button by the auction house's Search button, counting down the game's 15 minutes between scans. |
+| View | Scan button on the Buy page | On | A Scan AH button left of the auction house's filter button, counting down the game's 15 minutes between scans. |
 | View | Scan when the auction house opens, Scan Now | Off | A full scan when you open the auction house (it can stall the game a moment), or now. |
 | View | Stack value on item lines | On | List view: each stack's auction value beside its count (gray: vendor value, with Vendor Fallback). |
 | View | Price each on item lines | Off | List view: one item's auction price beside its count. |

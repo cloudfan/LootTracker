@@ -394,7 +394,7 @@ local function UpdateScanButton()
 end
 
 -- Made when the auction house first opens (its window loads on demand): a
--- child of Blizzard's auction house window, left of the Buy page's Search
+-- child of Blizzard's auction house window, left of the Buy page's filter
 -- button, shown while the Buy page's search bar is; on the older auction
 -- house, above its browse tab's Search button.
 local buttonWhy = "the auction house has not opened yet"
@@ -414,7 +414,9 @@ function ns.CreateScanButton()
 	local frame, bar, anchor = AuctionHouseFrame, nil, nil
 	if frame then
 		bar = frame.SearchBar
-		anchor = bar and bar.SearchButton
+		-- Left of the filter button (FilterButton, or FilterDropdown on newer
+		-- clients), else of the Search button.
+		anchor = bar and (bar.FilterButton or bar.FilterDropdown or bar.SearchButton)
 	elseif AuctionFrame then
 		frame, bar, anchor = AuctionFrame, AuctionFrameBrowse, BrowseSearchButton
 	end
