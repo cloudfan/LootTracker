@@ -681,7 +681,8 @@ API.On("CHAT_MSG_LOOT", function(_, text)
 end)
 
 -- Sources already recorded this session (a corpse opened twice, a chest
--- left half looted), by kind and GUID.
+-- left half looted), by kind and GUID. A gathering node is recorded again
+-- after each gathering cast on it (OnLootOpened).
 local recorded = {}
 
 
@@ -839,7 +840,12 @@ local function OnLootOpened()
 			kind, id, sourceName, school = Classify(guid, fishing, cast)
 		end
 		local seenKey = kind and (kind .. guid)
-		if kind and (guid == "Fishing" or not recorded[seenKey]) then
+		-- A node is gathered again and again (an ore vein gives three or
+		-- four loots): each loot after a gathering cast of its own is a
+		-- new one. Without a fresh cast it is the same loot window opened
+		-- again, and is not counted twice.
+		local again = kind == "node" and cast == "gather"
+		if kind and (guid == "Fishing" or again or not recorded[seenKey]) then
 			recorded[seenKey] = true
 			local bucket = buckets[guid]
 			local items, waiting, money = bucket.items, nil, bucket.money

@@ -85,17 +85,18 @@ end
 local events = CreateFrame("Frame")
 local handlers = {}
 
--- With Pillars UI's own Loot Tracker module on, this addon stands down:
--- both would track every loot and show a frame.
+-- With Pillars UI's or CRPGui's own Loot Tracker module on, this addon
+-- stands down: both would track every loot and show a frame.
 local function PillarsModuleOn()
 	if ns.standingDown then
 		return true
 	end
 	local loaded = C_AddOns and C_AddOns.IsAddOnLoaded or IsAddOnLoaded
-	if loaded and loaded("PillarsUI_LootTracker") then
+	local other = loaded and (loaded("PillarsUI_LootTracker") and "Pillars UI" or loaded("CRPGui_LootTracker") and "CRPGui")
+	if other then
 		ns.standingDown = true
 		API.Fire("StandDown")
-		API.Print("Pillars UI's Loot Tracker module is on, so this Loot Tracker stays off. Turn one of the two off.")
+		API.Print(other .. "'s Loot Tracker module is on, so this Loot Tracker stays off. Turn one of the two off.")
 		return true
 	end
 	return false

@@ -294,174 +294,99 @@ if StaticPopupDialogs then
 	}
 end
 
--- The settings ---------------------------------------------------------------------
+-- The settings (the same as CRPGui's Loot Tracker page) -----------------------------
 
 local function Off(key)
 	return function()
 		return not Get(key)
 	end
 end
-local function NotList()
-	return Get("view") ~= "list"
-end
 
 Header("Loot Tracker", true)
-Note("What you loot and from what: creatures (a kill is a corpse you looted), their skinning and pickpocketing, chests, lockboxes, resource nodes and fishing. Gold is shown beside each source's name, with its items' value if you like. Kept per character. /lt opens this page, /lt unlock lets you drag the tracker.")
+Note("What you loot and from what: creatures (a kill is a corpse you looted), their skinning and pickpocketing, chests, lockboxes, resource nodes, fishing and disenchanting, with gold and item values. Kept per character. The arrow in the window's title bar holds what is changed most; /lt opens this page.")
 
-Header("Tracking")
-Dropdown(1, "Grouping", "grouping", Items({
-	{ value = "grouped", label = "Grouped (merged by ID)" },
-	{ value = "individual", label = "Individualized (each loot)" },
-}), "Grouped: every kill is kept, and creatures (or chests, nodes, ...) of the same ID share one entry. Individualized: one entry per loot, newest first (the last 300).")
-Dropdown(2, "Show", "scope", Items({
+Header("Window")
+Button(1, "Show or Hide the Window", function()
+	ns.ToggleWindow()
+end, "Shows or hides the window. Its close button hides it; this brings it back (so does /lt show).")
+Checkbox(2, "Lock the window", "locked", "The window cannot be dragged by its title or resized. The lock button in its title bar does the same.")
+EndRow()
+Checkbox(1, "Creature portraits", "portraits", "A small 3D model of each creature beside its name.")
+Dropdown(2, "Shows", "scope", Items({
 	{ value = "all", label = "All Time" },
-	{ value = "session", label = "This Session (since login)" },
-	{ value = "instance", label = "This Instance (the current run)" },
-}), "All Time: everything kept. This Session: since you logged in (a reload carries on). This Instance: since you entered the instance you are in, or were last in. Also in the menu by the tracker's title.")
+	{ value = "session", label = "This Session" },
+	{ value = "instance", label = "This Instance" },
+}), "Everything this character has tracked, this login only (a reload carries on), or the current instance run only.")
 EndRow()
-Checkbox(1, "Creatures", "trackCreatures")
-Checkbox(2, "Chests", "trackChests")
+Dropdown(1, "Grouping", "grouping", Items({
+	{ value = "grouped", label = "By Source" },
+	{ value = "individual", label = "Each Loot" },
+}), "One entry per source with everything it has given, or one entry per loot (the last 300).")
+Dropdown(2, "Sort Sources", "entrySort", Items({
+	{ value = "newest", label = "Newest First" },
+	{ value = "value", label = "By Value" },
+}), "The order of the sources.")
 EndRow()
-Checkbox(1, "Merge Skinning", "skinningMerge", "Off: skinning loot is an entry of its own. On: it goes into the creature's loot.", Off("trackCreatures"))
-Checkbox(2, "Merge Pickpocketing", "pickpocketMerge", "Off: pickpocketing loot is an entry of its own. On: it goes into the creature's loot.", Off("trackCreatures"))
+Dropdown(1, "Sort Items", "itemSort", Items({
+	{ value = "quality", label = "By Quality" },
+	{ value = "newest", label = "Newest First" },
+	{ value = "value", label = "By Value" },
+}), "The order of a source's items.")
+Button(2, "Reset Position", function()
+	API.Set("positions", "lootTracker", nil)
+end, "The window back to its place on the right of the screen.")
 EndRow()
-Checkbox(1, "Lockboxes", "trackLockboxes", "Lockboxes and other containers you open from your bags.")
-Checkbox(2, "Resource Nodes", "trackNodes", "Mining and herbalism. Copper Vein and Poor Copper Vein share one entry, as do Peacebloom and Wilted Peacebloom.")
+
+Header("What Is Tracked")
+Checkbox(1, "Only what you receive", "confirmLoot", "An item counts once the game says you received it, and gold once your purse grows, so lost rolls and others' shares never count.")
+Checkbox(2, "Creatures", "trackCreatures", "Loot from corpses.")
 EndRow()
-Checkbox(1, "Disenchanting", "trackDisenchant", "What disenchanting gives you, all in one entry: Disenchanted.")
-Checkbox(2, "Only What You Receive", "confirmLoot", "An item counts only once the game says you received it (\"You receive loot: ...\"). In a group, what someone else takes or wins the roll for, and what you leave behind, is not counted; a roll you win counts for its source when it comes. Gold counts as your purse grows: your share in a group. Off: everything the loot window shows counts when it opens.")
+Checkbox(1, "Skinning in the creature's entry", "skinningMerge", "Skinning loot goes into the creature's own entry instead of one of its own.", Off("trackCreatures"))
+Checkbox(2, "Pickpocketing in the creature's entry", "pickpocketMerge", "Pickpocketing loot goes into the creature's own entry instead of one of its own.", Off("trackCreatures"))
 EndRow()
-Checkbox(1, "Fishing", "trackFishing")
-Dropdown(2, "Fishing Grouping", "fishingGrouping", Items({
+Checkbox(1, "Chests", "trackChests", "Loot from chests and other containers in the world.")
+Checkbox(2, "Lockboxes", "trackLockboxes", "Loot from lockboxes and other containers opened from your bags.")
+EndRow()
+Checkbox(1, "Disenchanting", "trackDisenchant", "What disenchanting gives, in one Disenchanted entry.")
+Checkbox(2, "Resource nodes", "trackNodes", "Mining and herbalism nodes. Each gathering of a node counts: an ore vein gives several loots.")
+EndRow()
+Checkbox(1, "Fishing", "trackFishing", "What you fish up.")
+Dropdown(2, "Fishing Entries", "fishingGrouping", Items({
 	{ value = "zone", label = "By Zone" },
-	{ value = "separated", label = "Separated (schools by type)" },
-}), "By Zone: all of a zone's fishing in one entry. Separated: open water by zone, and what came from schools by the school's type.", Off("trackFishing"))
+	{ value = "separated", label = "Schools Separately" },
+}), "One entry per zone, or schools by their type.", Off("trackFishing"))
 EndRow()
+
+Header("Value")
+Dropdown(1, "Item Value", "itemValue", Items({
+	{ value = "auction", label = "Auction" },
+	{ value = "vendor", label = "Vendor" },
+	{ value = "none", label = "None" },
+}), "What an item counts for: the last auction scan's lowest buyout (vendor value where it has none), vendor value, or nothing.")
+Button(2, "Scan Now", function()
+	ns.Scan()
+end, "At the auction house: reads every auction's lowest price. The game allows it once every 15 minutes.")
+EndRow()
+Checkbox(1, "Scan button at the auction house", "auctionButton", "A Scan AH button on the auction house's Buy page.")
+Checkbox(2, "Scan when the auction house opens", "auctionAutoScan", "A full scan each time it opens (it can stall the game a moment).")
+EndRow()
+Checkbox(1, "Learn prices while browsing", "auctionBrowse", "Browsing the auction house updates the prices it shows.")
+Checkbox(2, "Auction price in our item tooltips", "tooltipAuction", "Under Sell Price in the tooltip of an item in the tracker.")
+EndRow()
+Checkbox(1, "Auction price in every item tooltip", "tooltipEverywhere", "Those lines in bags, links and everywhere else too.")
+EndRow()
+
+Header("Data")
 Button(1, "Export", function()
 	ns.Export()
-end, "The entries as shown, as plain text in a box to copy.")
+end, "The shown entries as plain text, in a window to copy from.")
 Button(2, "Export Name Database", function()
 	ns.ExportNames()
-end, "Every creature looted in an instance, and every chest, node and other world object, with the names learned on any of your characters, as lines to send to the developer.")
+end, "The creature and object names learned, as text to send for the shipped list.")
 EndRow()
 Button(1, "Reset All Loot...", function()
 	StaticPopup_Show("LOOTTRACKER_RESET")
-end, "Forget everything tracked on this character (it asks first).")
-EndRow()
-
-Header("View")
-Dropdown(1, "Item Value", "itemValue", Items({
-	{ value = "vendor", label = "Vendor Value" },
-	{ value = "auction", label = "Auction Value" },
-	{ value = "none", label = "None" },
-}), "Beside each source's name: its gold, plus what its items are worth to a vendor, or at your realm's lowest auction buyout at the last scan (items not listed count at vendor value). None: the gold alone.")
-Dropdown(2, "View", "view", Items({ { value = "list", label = "List" }, { value = "icons", label = "Icons" } }), "List: item names in their quality's color, the count on the right. Icons: a grid of item icons.")
-EndRow()
-Checkbox(1, "Scan when the auction house opens", "auctionAutoScan", "A full scan each time you open the auction house (when the game allows one, every 15 minutes). It can stall the game a moment. Prices are kept per realm for all your characters.")
-Button(2, "Scan Now", function()
-	ns.Scan()
-end, "Scan the auction house now (it must be open). The chat says how it went.")
-EndRow()
-Checkbox(1, "Update prices while browsing", "auctionBrowse", "Every item the auction house's Buy page shows, and the listings you open, update its price, with no full scan.")
-Checkbox(2, "Scan button on the Buy page", "auctionButton", "A Scan AH button left of the auction house's filter button, counting down the game's 15 minutes between scans.")
-EndRow()
-Checkbox(1, "Stack value on item lines", "lineValue", "List view: the stack's auction value beside each item's count. Gold: an auction price; gray: a vendor price standing in (Vendor Fallback).", NotList)
-Checkbox(2, "Price each on item lines", "lineValueEach", "List view: one item's auction price beside its count, in brackets after the stack value when both are on.", NotList)
-EndRow()
-Checkbox(1, "Stack value on item icons", "iconValue", "Icons view: the stack's auction value in each icon's top corner.", function()
-	return Get("view") ~= "icons"
-end)
-Checkbox(2, "Short values (12g, 34s)", "valueShort", "Lines and icons: the largest coin only, instead of gold, silver and copper.")
-EndRow()
-Checkbox(1, "Vendor Fallback", "valueFallback", "Items with no auction price (not listed at the last scan, or soulbound) show their vendor price, in gray. Off: they show nothing.")
-Checkbox(2, "Auction price in item tooltips", "tooltipAuction", "An item's tooltip: its auction price right under the game's Sell Price line, in the same style, or that it was not listed.")
-EndRow()
-Checkbox(1, "Stack's auction price in item tooltips", "tooltipAuctionStack", "An item's tooltip: a second line with the auction price of the whole stack looted (Auction Price (x4)), for stacks of more than one.", function()
-	return not Get("tooltipAuction")
-end)
-Checkbox(2, "Price's age in item tooltips", "tooltipScanAge", "An item's tooltip: how long ago its auction price was seen (browsing or a full scan).")
-EndRow()
-Checkbox(1, "In every item tooltip", "tooltipEverywhere", "The auction price and last scan's age in every item's tooltip (bags, links, the bank, vendors ...), not only the tracker's. Outside the tracker, the price is for one item.")
-EndRow()
-Dropdown(1, "Item Sort", "itemSort", Items({
-	{ value = "quality", label = "Quality" },
-	{ value = "newest", label = "Newest" },
-	{ value = "value", label = "Value" },
-}), "The order of each source's items: best quality first, most recently looted first, or most valuable stack first.")
-Dropdown(2, "Source Sort", "entrySort", Items({ { value = "newest", label = "Newest" }, { value = "value", label = "Value" } }), "The order of the sources: most recently looted first, or most valuable first.")
-EndRow()
-Checkbox(1, "Item icons in the list", "listIcons", nil, NotList)
-Slider(2, "Icon Size", "iconSize", 16, 48, 1, nil, function()
-	return Get("view") ~= "icons"
-end)
-EndRow()
-Checkbox(1, "Scroll Bar", "scrollBar", "A scroll bar beside the list while it is longer than the frame. The mouse wheel scrolls either way.")
-Slider(2, "Scroll Bar Width", "scrollBarWidth", 2, 16, 1, nil, Off("scrollBar"))
-EndRow()
-Checkbox(1, "Portraits (experimental)", "portraits", "A round portrait of the source before its name: the creature's model, or an icon for chests, nodes, lockboxes and fishing.")
-EndRow()
-
-Header("Background Bars")
-local function NoLineBars()
-	return NotList() or not Get("lineBars")
-end
-Checkbox(1, "Source Row Bars", "headerBars", "A bar behind each source's row (both views).")
-Checkbox(2, "Item Line Bars", "lineBars", "A bar behind each item line (List view).", NotList)
-EndRow()
-Dropdown(1, "Source Row Texture", "headerBarTexture", MediaItems(API.MEDIA.STATUSBAR, "Default (Blizzard)"), nil, Off("headerBars"))
-Dropdown(2, "Item Line Texture", "lineBarTexture", MediaItems(API.MEDIA.STATUSBAR, "Default (Blizzard)"), nil, NoLineBars)
-EndRow()
-Color(1, "Source Row Color", "headerBarColor", Off("headerBars"))
-Slider(2, "Source Row Opacity", "headerBarAlpha", 0.05, 1, 0.05, Percent, Off("headerBars"))
-EndRow()
-Dropdown(1, "Line Bar Color", "lineBarColorMode", Items({ { value = "quality", label = "Item Quality" }, { value = "custom", label = "Custom Color" } }), nil, NoLineBars)
-Color(2, "Custom Line Color", "lineBarColor", function()
-	return NoLineBars() or Get("lineBarColorMode") ~= "custom"
-end)
-EndRow()
-Dropdown(1, "Line Bar Length", "lineBarLength", Items({ { value = "full", label = "Full Width" }, { value = "count", label = "By Count" } }), "Full Width: every bar fills its line. By Count: as long as the item's count against the source's most-looted item.", NoLineBars)
-Slider(2, "Line Bar Opacity", "lineBarAlpha", 0.05, 1, 0.05, Percent, NoLineBars)
-EndRow()
-
-Header("Text")
-Dropdown(1, "Font", "font", MediaItems(API.MEDIA.FONT, "Default (Friz Quadrata)"))
-Dropdown(2, "Text Shadow", "fontShadow", Items({
-	{ value = "global", label = "Default (Soft Shadow)" },
-	{ value = "none", label = "None" },
-	{ value = "soft", label = "Soft Shadow" },
-	{ value = "outline", label = "Outline" },
-	{ value = "thick", label = "Thick Outline" },
-}))
-EndRow()
-Slider(1, "Text Size", "fontSize", 0, 24, 1, function(value)
-	return value == 0 and "Auto" or tostring(value)
-end, nil, "The item lines' size; names, money and the title follow in step. All the way left: the tracker's own sizes.")
-EndRow()
-
-Header("Frame")
-Checkbox(1, "Unlock (drag it)", nil, "While unlocked the tracker shows (even folded away) and can be dragged. Also /lt unlock and /lt lock.", nil, function()
-	return not API.Get("loot", "locked")
-end, function(on)
-	API.SetUnlocked(on)
-end)
-Dropdown(2, "Arrow Side", "arrowSide", Items({
-	{ value = "LEFT", label = "Left" },
-	{ value = "RIGHT", label = "Right" },
-	{ value = "TOP", label = "Top" },
-	{ value = "BOTTOM", label = "Bottom" },
-}), "The side of the frame the arrow that hides it sits on.")
-EndRow()
-Slider(1, "Width", "width", 140, 600, 1)
-Slider(2, "Height", "height", 80, 900, 1)
-EndRow()
-Checkbox(1, "Border", "border")
-EndRow()
-Dropdown(1, "Background", "background", MediaItems(API.MEDIA.BACKGROUND, "Default (Solid)"))
-Slider(2, "Background Opacity", "backgroundAlpha", 0, 1, 0.05, Percent)
-EndRow()
-Button(1, "Reset Position", function()
-	API.ResetPositions()
-end)
+end, "Forgets everything the Loot Tracker has tracked on this character. It asks first.")
 Button(2, "Reset All Settings...", function()
 	StaticPopup_Show("LOOTTRACKER_RESET_SETTINGS")
 end, "Every Loot Tracker setting back to its default. What you looted stays.")
@@ -515,8 +440,8 @@ SLASH_LOOTTRACKER2 = "/loottracker"
 SlashCmdList.LOOTTRACKER = function(msg)
 	local command = strlower(strtrim(msg or ""))
 	if command == "unlock" or command == "lock" then
-		API.SetUnlocked(command == "unlock")
-		API.Print(command == "lock" and "locked." or "unlocked: drag the tracker, then /lt lock.")
+		Set("locked", command == "lock")
+		API.Print(command == "lock" and "locked." or "unlocked: drag the window by its title, resize it by its corner.")
 	elseif command == "show" or command == "hide" or command == "toggle" then
 		local collapsed = command == "hide" or (command == "toggle" and not Get("collapsed"))
 		Set("collapsed", collapsed)
