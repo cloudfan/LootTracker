@@ -337,6 +337,38 @@ Button(2, "Reset Position", function()
 end, "The window back to its place on the right of the screen.")
 EndRow()
 
+Header("View")
+Dropdown(1, "View", "view", Items({
+	{ value = "list", label = "List" },
+	{ value = "icons", label = "Icons" },
+}), "List: a line per item, its name in its quality's color. Icons: a grid of item icons, each with its count and tooltip.")
+Checkbox(2, "Item icons in the list", "listIcons", "List view: each item's icon before its name.", function()
+	return Get("view") == "icons"
+end)
+EndRow()
+Slider(1, "Icon Size", "iconSize", 16, 48, 1, nil, function()
+	return Get("view") ~= "icons"
+end, "Icons view: how large the icons are.")
+Checkbox(2, "Stack value on item icons", "iconValue", "Icons view: the stack's auction value in each icon's top corner (gray: a vendor price standing in).", function()
+	return Get("view") ~= "icons"
+end)
+EndRow()
+
+Header("Text")
+Dropdown(1, "Font", "font", MediaItems(API.MEDIA.FONT, "Default (Friz Quadrata)"), "Any font the game has, or that SharedMedia packs and other addons add.")
+Dropdown(2, "Text Shadow", "fontShadow", Items({
+	{ value = "global", label = "Default (Soft Shadow)" },
+	{ value = "none", label = "None" },
+	{ value = "soft", label = "Soft Shadow" },
+	{ value = "outline", label = "Outline" },
+	{ value = "thick", label = "Thick Outline" },
+}))
+EndRow()
+Slider(1, "Text Size", "fontSize", 0, 24, 1, function(value)
+	return value == 0 and "Auto" or tostring(value)
+end, nil, "The item lines' size; names, values and the total follow in step. All the way left: the tracker's own sizes.")
+EndRow()
+
 Header("What Is Tracked")
 Checkbox(1, "Only what you receive", "confirmLoot", "An item counts once the game says you received it, and gold once your purse grows, so lost rolls and others' shares never count.")
 Checkbox(2, "Creatures", "trackCreatures", "Loot from corpses.")

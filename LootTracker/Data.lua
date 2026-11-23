@@ -32,7 +32,16 @@ local DEFAULTS = {
 	tooltipAuctionStack = true,  -- item tooltip: the looted stack's auction price too (x4)
 	tooltipScanAge = true,       -- item tooltip: how old the price is
 	tooltipEverywhere = false,   -- those lines in every item tooltip (bags, links, ...), not only ours
+	-- Text: "global" is the game's own (Friz Quadrata, a soft shadow).
+	font = "global",
+	fontSize = 0,                -- 0: the tracker's own sizes; else the lines' size, the rest in step
+	fontShadow = "global",
 	-- The window
+	view = "list",               -- "list" or "icons"
+	listIcons = true,            -- List view: each item's icon before its name
+	iconSize = 24,               -- Icons view: the icons' size
+	iconValue = false,           -- Icons view: the stack's auction value on each icon
+	valueShort = true,           -- values in short form (12g, 34s, 56c)
 	itemSort = "quality",        -- a source's items: "quality", "newest" or "value"
 	entrySort = "newest",        -- the sources: "newest" or "value"
 	portraits = true,            -- the creature's model beside its name

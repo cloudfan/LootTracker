@@ -18,7 +18,19 @@ local Setting = ns.Setting
 
 local ROW, HEAD = 18, 26
 local frame, scroll, content
-local heads, lines = {}, {}
+local heads, lines, icons = {}, {}, {}
+
+-- Text in the chosen font, size and shadow (Text: Font, Text Shadow, Text
+-- Size). Sizes are given at the lines' size of 12; Text Size moves them all.
+local function Font(fontString, size)
+	local font, shadow, lineSize = Setting("font"), Setting("fontShadow"), tonumber(Setting("fontSize")) or 0
+	API.ApplyFont(fontString, {
+		font = font ~= "global" and font or nil,
+		size = lineSize > 0 and math.max(6, size + lineSize - 12) or size,
+		shadow = shadow ~= "global" and shadow or nil,
+		color = false,
+	})
+end
 
 local function Render() end -- below
 
@@ -128,6 +140,43 @@ local function Line(i)
 	return row
 end
 
+-- Icons view: a grid of item icons, each with its count (and its stack's
+-- value, Stack value on item icons) and its tooltip.
+local function Icon(i)
+	local button = icons[i]
+	if button then
+		return button
+	end
+	button = CreateFrame("Button", nil, content)
+	button.icon = button:CreateTexture(nil, "ARTWORK")
+	button.icon:SetAllPoints()
+	button.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	button.edge = button:CreateTexture(nil, "OVERLAY")
+	button.edge:SetTexture([[Interface\Common\WhiteIconFrame]])
+	button.edge:SetAllPoints()
+	button.count = button:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	button.count:SetPoint("BOTTOMRIGHT", -1, 2)
+	button.count:SetJustifyH("RIGHT")
+	button.value = button:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	button.value:SetPoint("TOPLEFT", 1, -2)
+	button.value:SetJustifyH("LEFT")
+	button.highlight = button:CreateTexture(nil, "HIGHLIGHT")
+	button.highlight:SetAllPoints()
+	button.highlight:SetColorTexture(1, 1, 1, 0.15)
+	button:SetScript("OnEnter", ns.ShowItemTooltip)
+	button:SetScript("OnLeave", function(self)
+		self.lootTrackerItem = nil
+		GameTooltip:Hide()
+	end)
+	button:SetScript("OnClick", function(self)
+		if self.link and IsModifiedClick and IsModifiedClick("CHATLINK") and ChatEdit_InsertLink then
+			ChatEdit_InsertLink(self.link)
+		end
+	end)
+	icons[i] = button
+	return button
+end
+
 -- A creature's portrait: its model, held on its first frame. Models are
 -- not cut off by the list's edge, so one shows only while its row is
 -- wholly inside it.
@@ -190,8 +239,11 @@ Render = function()
 	end
 	local width = scroll:GetWidth()
 	content:SetWidth(width)
-	local y, headCount, lineCount = 0, 0, 0
+	local y, headCount, lineCount, iconCount = 0, 0, 0, 0
 	local grouped = Setting("grouping") ~= "individual"
+	local iconsView = Setting("view") == "icons"
+	local withIcons = Setting("listIcons") and true or false
+	local size = tonumber(Setting("iconSize")) or 28
 	for _, entry in ipairs(ns.Entries()) do
 		headCount = headCount + 1
 		local row = Head(headCount)
@@ -204,22 +256,61 @@ Render = function()
 		Portrait(row, entry)
 		row:Show()
 		y = y + HEAD + 2
+		Font(row.name, 12)
+		Font(row.value, 11)
 		if not ns.Folded(entry.key) then
-			for _, item in ipairs(entry.items) do
-				lineCount = lineCount + 1
-				local line = Line(lineCount)
-				line.link = item.link
-				line:ClearAllPoints()
-				line:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -y)
-				line:SetPoint("RIGHT", content, "RIGHT", 0, 0)
-				line.icon:SetTexture(item.icon or [[Interface\Icons\INV_Misc_QuestionMark]])
-				local r, g, b = ns.QualityColor(item.quality)
-				line.name:SetText((item.name or (item.link and item.link:match("%[(.-)%]")) or "?") .. ((item.count or 0) > 1 and ("  x" .. item.count) or ""))
-				line.name:SetTextColor(r or 1, g or 1, b or 1)
-				local value = ns.ItemValue(item)
-				line.value:SetText(Setting("itemValue") ~= "none" and value > 0 and ns.ShortMoney(value) or "")
-				line:Show()
-				y = y + ROW
+			if not iconsView then
+				for _, item in ipairs(entry.items) do
+					lineCount = lineCount + 1
+					local line = Line(lineCount)
+					line.link = item.link
+					line.itemCount = item.count
+					line:ClearAllPoints()
+					line:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -y)
+					line:SetPoint("RIGHT", content, "RIGHT", 0, 0)
+					line.icon:SetTexture(item.icon or [[Interface\Icons\INV_Misc_QuestionMark]])
+					line.icon:SetShown(withIcons)
+					line.name:SetPoint("LEFT", line, "LEFT", withIcons and ROW + 17 or 14, 0)
+					Font(line.name, 11)
+					Font(line.value, 10)
+					local r, g, b = ns.QualityColor(item.quality)
+					line.name:SetText((item.name or (item.link and item.link:match("%[(.-)%]")) or "?") .. ((item.count or 0) > 1 and ("  x" .. item.count) or ""))
+					line.name:SetTextColor(r or 1, g or 1, b or 1)
+					local value = ns.ItemValue(item)
+					line.value:SetText(Setting("itemValue") ~= "none" and value > 0 and ns.ShortMoney(value) or "")
+					line:Show()
+					y = y + ROW
+				end
+			else
+				local perRow = math.max(1, math.floor((width - 8) / (size + 3)))
+				for index, item in ipairs(entry.items) do
+					iconCount = iconCount + 1
+					local button = Icon(iconCount)
+					button.link, button.itemCount = item.link, item.count
+					local col, line = (index - 1) % perRow, math.floor((index - 1) / perRow)
+					button:ClearAllPoints()
+					button:SetPoint("TOPLEFT", content, "TOPLEFT", 8 + col * (size + 3), -(y + line * (size + 3)))
+					button:SetSize(size, size)
+					button.icon:SetTexture(item.icon or [[Interface\Icons\INV_Misc_QuestionMark]])
+					button.edge:SetVertexColor(ns.QualityColor(item.quality))
+					Font(button.count, math.max(9, math.floor(size * 0.4)))
+					button.count:SetTextColor(1, 1, 1)
+					button.count:SetText((item.count or 0) > 1 and item.count or "")
+					local text, auction
+					if Setting("iconValue") and Setting("itemValue") ~= "none" then
+						text, auction = ns.ValueText(item.link, item.count, false)
+					end
+					if text then
+						Font(button.value, math.max(8, math.floor(size * 0.32)))
+						button.value:SetText(text)
+						button.value:SetTextColor(auction and 1 or 0.6, auction and 0.82 or 0.6, auction and 0 or 0.6)
+					end
+					button.value:SetShown(text and true or false)
+					button:Show()
+				end
+				if #entry.items > 0 then
+					y = y + math.ceil(#entry.items / perRow) * (size + 3)
+				end
 			end
 			y = y + 4
 		end
@@ -230,6 +321,10 @@ Render = function()
 	for i = lineCount + 1, #lines do
 		lines[i]:Hide()
 	end
+	for i = iconCount + 1, #icons do
+		icons[i]:Hide()
+	end
+	Font(frame.total, 11)
 	content:SetHeight(math.max(1, y))
 	local sum = ns.Totals()
 	frame.total:SetText(headCount == 0 and "Nothing tracked yet." or ("Total: " .. ns.Money(sum.value)))
@@ -286,6 +381,9 @@ local function Menu(owner)
 			ns.SetScope("instance")
 		end)
 		root:CreateDivider()
+		local view = root:CreateButton("View")
+		Radio(view, "List", "view", "list")
+		Radio(view, "Icons", "view", "icons")
 		local grouping = root:CreateButton("Grouping")
 		Radio(grouping, "By Source", "grouping", "grouped")
 		Radio(grouping, "Each Loot", "grouping", "individual")

@@ -4,6 +4,7 @@ What you loot and from what, for World of Warcraft: Forever (`## Interface: 1600
 
 - **Sources:** creatures (each looted corpse a kill, grouped by creature or listed one by one), their skinning and pickpocketing (their own entries, or in the creature's), chests, lockboxes, resource nodes (Copper Veins together, Peaceblooms together; each gathering of a node counts, so an ore vein's several loots all do) and fishing (by zone, or schools by type). No combat log: the loot window says where each item and coin came from.
 - **Value:** gold beside each source's name, with its items' vendor value, or their auction value from a scan of your realm's auction house (once every 15 minutes, at the auction house).
+- **View:** items as a list colored by quality, or a grid of icons, each with its tooltip; any font (it bundles LibSharedMedia-3.0, so fonts SharedMedia packs and other addons register can be picked), shadow and size.
 - **Window:** in the look of Blizzard's group loot history window: a flat panel with a scrolling list, a total at the bottom and a resize grip. In its title bar: a close button, a lock button (locked: no dragging by the title, no resizing) and an arrow that opens a menu of the settings used most. Each source has a row with its portrait (the creature's model) or an icon, its name and its value; each item has a row under it, colored by quality, with its tooltip and auction price.
 - **Names:** creatures and world objects are named by ID, account-wide, even when the game hides names in an instance; hovering a source shows its NPC, object or item ID.
 - **Per entry:** a click on a source folds its loot; its X deletes it.
@@ -23,6 +24,12 @@ Options > AddOns > Loot Tracker, or `/lt`.
 | Window | Shows | All Time | All Time, This Session (since login; a reload carries on) or This Instance (the current run). Also in the title bar's menu. |
 | Window | Grouping | By Source | By Source (merged by ID) or Each Loot (the last 300). |
 | Window | Sort Sources, Sort Items | Newest First, By Quality | Newest First / By Value; By Quality / Newest First / By Value. |
+| View | View | List | List (a line per item in its quality's color) or Icons (a grid of item icons with their counts). Also in the title bar's menu. |
+| View | Item icons in the list | On | List view: each item's icon before its name. |
+| View | Icon Size | 24 | Icons view. |
+| View | Stack value on item icons | Off | Icons view: the stack's auction value on each icon (gray: vendor price). |
+| Text | Font, Text Shadow | Friz Quadrata, Soft | Any font, the game's or one SharedMedia packs add; None, Soft, Outline, Thick Outline. |
+| Text | Text Size | Auto | 0 (Auto) to 24: the item lines' size, the rest in step. |
 | Window | Reset Position |  | The window back to the right of the screen. |
 | What Is Tracked | Only what you receive | On | An item counts once the game says you received it, and gold once your purse grows, so lost rolls and others' shares never count. Where the game hides those lines, your bag counts stand in. |
 | What Is Tracked | Creatures, Chests, Lockboxes, Disenchanting, Resource nodes, Fishing | On | What is tracked. Disenchanting's loot goes into one entry, Disenchanted. |
