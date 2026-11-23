@@ -17,4 +17,4 @@ A World of Warcraft: Forever addon (`## Interface: 16001`, Lua 5.1). Standalone:
 - Saved data is its own (`LootTrackerDB` per character; `LootTrackerNames`, `LootTrackerPrices`, `LootTrackerSettings` account-wide); it never reads Pillars UI's (the owner's choice).
 - Keep the README's settings table in step with the defaults in `Data.lua` and the controls in `Settings.lua`.
 - Check syntax with `luac5.1 -p` on every Lua file before committing.
-- Releases: bump `## Version` in `LootTracker/LootTracker.toc`.
+- Releases: bump `## Version` in `LootTracker/LootTracker.toc` and run the Release workflow (`.github/workflows/release.yml`) with tag `v<version>` (or push that tag): it checks the version and the Lua, zips `LootTracker/` with the README and publishes the release.

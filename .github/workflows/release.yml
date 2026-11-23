@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to create and release, e.g. v2.1.0"
+        required: true
+
+env:
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the tag matches the .toc version
+        run: |
+          grep -qx "## Version: ${TAG#v}" LootTracker/LootTracker.toc \
+            || { echo "Tag ${TAG} does not match ## Version in LootTracker/LootTracker.toc"; exit 1; }
+
+      - name: Check the Lua compiles (Lua 5.1)
+        run: |
+          sudo apt-get install -y lua5.1 >/dev/null
+          find LootTracker -name '*.lua' -print0 | xargs -0 -n1 luac5.1 -p
+
+      - name: Build the addon zip
+        run: |
+          mkdir -p dist
+          cp -r LootTracker dist/
+          cp README.md dist/LootTracker/
+          cd dist && zip -r "LootTracker-${TAG}.zip" LootTracker
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # On a manual run the tag does not exist yet; --target creates it here.
+          gh release create "$TAG" "dist/LootTracker-${TAG}.zip" \
+            --target "$GITHUB_SHA" \
+            --title "Loot Tracker ${TAG}" \
+            --notes "Loot Tracker for WoW: Forever (## Interface: 16001). Standalone: needs no other addon.
+
+          Unzip into World of Warcraft\\_classic_beta_\\Interface\\AddOns\\ so you have AddOns\\LootTracker\\LootTracker.toc, then restart the client. It stays off while CRPGui's or Pillars UI's Loot Tracker module is on.
+
+          2.1.0: the window from CRPGui (Blizzard's loot history look, a lock and a settings menu in its title bar, portraits, fold and forget per source), the Icons view and font settings, and every gathering of a node counted."
