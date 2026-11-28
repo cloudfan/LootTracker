@@ -1,10 +1,11 @@
 local addonName, ns = ...
 local API = ns.API
 
--- Style "flare": in the look of the FlareUI suite: a near-black panel in a
--- double bronze frame with gold studs at its corners; a title bar ("Loot",
--- the number of sources, the scope as a word you click through, a minimize
--- box, the menu arrow) over a fading gold rule; each source with its icon in
+-- Style "flare": in the look of the FlareUI suite's quest panel: a
+-- near-black panel in one thin muted-bronze line with softly rounded corners
+-- (the game's tooltip border, tinted); a title bar ("Loot" in gold, the
+-- number of sources in gray, the scope as a word you click through, a
+-- minimize box, the menu arrow) over a thin brown rule; each source with its icon in
 -- a bronze portrait ring (Media\PortraitRing.tga), its count in orange
 -- brackets and its name in old gold; its items in their quality's colors
 -- with bronze-edged icons (or a grid of them, Icons view); the total in a
@@ -13,14 +14,19 @@ local API = ns.API
 local Setting = ns.Setting
 local MEDIA = [[Interface\AddOns\]] .. addonName .. [[\Media\]]
 
-local BACK = { 0.035, 0.03, 0.025, 0.93 }
-local OUTER = { 0.45, 0.34, 0.19 }
-local INNER = { 0.78, 0.62, 0.36 }
-local GOLD = { 0.96, 0.80, 0.47 }
-local SECTION = { 0.84, 0.68, 0.42 }
-local ACCENT = { 0.95, 0.60, 0.25 }
-local TEXT = { 0.88, 0.86, 0.82 }
-local DIM = { 0.60, 0.57, 0.52 }
+-- Sampled from FlareUI's quest panel: its ground, its border line, the rule
+-- under its title, its gold titles, tan zone names, orange-brown level
+-- brackets, cream objectives and gray-tan count.
+local BACK = { 0.016, 0.008, 0, 0.94 }
+local EDGE = { 0.45, 0.35, 0.21 }
+local RULE = { 0.22, 0.16, 0.09 }
+local OUTER = { 0.33, 0.25, 0.14 }
+local INNER = { 0.49, 0.37, 0.22 }
+local GOLD = { 0.97, 0.82, 0.28 }
+local SECTION = { 0.83, 0.70, 0.41 }
+local ACCENT = { 0.80, 0.47, 0.18 }
+local TEXT = { 0.91, 0.84, 0.69 }
+local DIM = { 0.63, 0.56, 0.44 }
 
 local TITLE_HEIGHT, FOOTER_HEIGHT, HEAD, ROW = 26, 22, 26, 18
 
@@ -34,18 +40,13 @@ local function Hex(color)
 	return ("|cff%02x%02x%02x"):format(color[1] * 255, color[2] * 255, color[3] * 255)
 end
 
--- A gold rule along a frame's top or bottom edge, fading out at both ends.
+-- A thin brown rule along a frame's top or bottom edge, a little in from
+-- its sides (the line under the quest panel's title).
 local function Rule(parent, edge)
-	local left = parent:CreateTexture(nil, "ARTWORK")
-	left:SetHeight(1)
-	left:SetPoint(edge .. "LEFT", parent, edge .. "LEFT")
-	left:SetPoint(edge .. "RIGHT", parent, edge)
-	local right = parent:CreateTexture(nil, "ARTWORK")
-	right:SetHeight(1)
-	right:SetPoint(edge .. "LEFT", parent, edge)
-	right:SetPoint(edge .. "RIGHT", parent, edge .. "RIGHT")
-	ns.Gradient(left, INNER[1], INNER[2], INNER[3], 0, INNER[1], INNER[2], INNER[3], 0.9)
-	ns.Gradient(right, INNER[1], INNER[2], INNER[3], 0.9, INNER[1], INNER[2], INNER[3], 0)
+	local line = ns.Fill(parent, "ARTWORK", RULE[1], RULE[2], RULE[3], 1)
+	line:SetHeight(1)
+	line:SetPoint(edge .. "LEFT", parent, edge .. "LEFT", 4, 0)
+	line:SetPoint(edge .. "RIGHT", parent, edge .. "RIGHT", -4, 0)
 end
 
 -- An icon in a round bronze ring.
@@ -172,24 +173,28 @@ local SCOPES = { all = "All", session = "Session", instance = "Instance" }
 local NEXT_SCOPE = { all = "session", session = "instance", instance = "all" }
 
 local function Build()
-	local frame = ns.NewStyleFrame("flare", 4)
-	ns.PaintScrollBar(frame.bar, 0, 0, 0, 0.35, OUTER[1], OUTER[2], OUTER[3], 1)
+	local frame = ns.NewStyleFrame("flare", 2)
+	ns.PaintScrollBar(frame.bar, 0, 0, 0, 0, INNER[1], INNER[2], INNER[3], 1)
 	frame:EnableMouse(true)
 
-	-- The panel: near black, a bronze line, a dark gap, a gold line, studs.
-	local back = ns.Fill(frame, "BACKGROUND", BACK[1], BACK[2], BACK[3], BACK[4])
-	back:SetPoint("TOPLEFT", 1, -1)
-	back:SetPoint("BOTTOMRIGHT", -1, 1)
-	ns.Outline(frame, OUTER[1], OUTER[2], OUTER[3], 1, 0, "BORDER")
-	ns.Outline(frame, 0.12, 0.09, 0.05, 1, 1, "BORDER", 2)
-	ns.Outline(frame, INNER[1], INNER[2], INNER[3], 0.9, 3, "BORDER")
-	for _, corner in ipairs({ "TOPLEFT", "TOPRIGHT", "BOTTOMLEFT", "BOTTOMRIGHT" }) do
-		local stud = ns.Fill(frame, "OVERLAY", GOLD[1], GOLD[2], GOLD[3], 1)
-		stud:SetSize(5, 5)
-		stud:SetPoint("CENTER", frame, corner, 0, 0)
-		if stud.SetRotation then
-			pcall(stud.SetRotation, stud, math.pi / 4)
-		end
+	-- The panel: near black in one thin bronze line with rounded corners
+	-- (the tooltip border, tinted); without backdrops, a square line.
+	local panel = CreateFrame("Frame", nil, frame, BackdropTemplateMixin and "BackdropTemplate" or nil)
+	panel:SetAllPoints()
+	panel:SetFrameLevel(frame:GetFrameLevel())
+	if panel.SetBackdrop then
+		panel:SetBackdrop({
+			bgFile = [[Interface\Buttons\WHITE8X8]],
+			edgeFile = [[Interface\Tooltips\UI-Tooltip-Border]],
+			edgeSize = 12,
+			insets = { left = 3, right = 3, top = 3, bottom = 3 },
+		})
+		panel:SetBackdropColor(BACK[1], BACK[2], BACK[3], BACK[4])
+		panel:SetBackdropBorderColor(EDGE[1], EDGE[2], EDGE[3], 1)
+	else
+		local back = ns.Fill(panel, "BACKGROUND", BACK[1], BACK[2], BACK[3], BACK[4])
+		back:SetAllPoints()
+		ns.Outline(panel, EDGE[1], EDGE[2], EDGE[3], 1, 1, "BORDER")
 	end
 
 	-- The title bar.
@@ -197,9 +202,6 @@ local function Build()
 	title:SetPoint("TOPLEFT", 4, -4)
 	title:SetPoint("TOPRIGHT", -4, -4)
 	title:SetHeight(TITLE_HEIGHT)
-	local band = title:CreateTexture(nil, "BACKGROUND")
-	band:SetAllPoints()
-	ns.Gradient(band, 0.13, 0.10, 0.06, 0.9, 0.05, 0.04, 0.03, 0.6)
 	Rule(title, "BOTTOM")
 	title.text = title:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 	title.text:SetPoint("LEFT", 8, 0)
@@ -228,20 +230,21 @@ local function Build()
 	end)
 	Tip(arrow, "Loot Tracker Settings", "Scope, view, grouping, values, sorting, style, export, reset.")
 
-	-- Minimize: a small bronze box with a dash (a cross while minimized).
+	-- Minimize: a small bronze box with a dash (a cross while minimized),
+	-- in the panel's quiet tan.
 	local minimize = CreateFrame("Button", nil, title)
 	minimize:SetSize(12, 12)
 	minimize:SetPoint("RIGHT", arrow, "LEFT", -6, 0)
 	minimize.box = ns.Outline(minimize, INNER[1], INNER[2], INNER[3], 1, 0, "ARTWORK")
-	minimize.dash = ns.Fill(minimize, "ARTWORK", GOLD[1], GOLD[2], GOLD[3], 1)
+	minimize.dash = ns.Fill(minimize, "ARTWORK", DIM[1], DIM[2], DIM[3], 1)
 	minimize.dash:SetSize(6, 1)
 	minimize.dash:SetPoint("CENTER")
-	minimize.stem = ns.Fill(minimize, "ARTWORK", GOLD[1], GOLD[2], GOLD[3], 1)
+	minimize.stem = ns.Fill(minimize, "ARTWORK", DIM[1], DIM[2], DIM[3], 1)
 	minimize.stem:SetSize(1, 6)
 	minimize.stem:SetPoint("CENTER")
 	minimize:SetScript("OnClick", ns.ToggleMinimized)
 	function minimize:Hover(inside)
-		local color = inside and GOLD or INNER
+		local color = inside and SECTION or INNER
 		self.box:SetColor(color[1], color[2], color[3], 1)
 	end
 	Tip(minimize, function()
