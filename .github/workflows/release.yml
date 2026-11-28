@@ -39,16 +39,50 @@ jobs:
           cp README.md dist/LootTracker/
           cd dist && zip -r "LootTracker-${TAG}.zip" LootTracker
 
+      # release.json (the BigWigs packager's convention): which zip is for which
+      # game flavor. Addon managers (WoWDeck, WowUp) read it to offer the
+      # release to WoW Forever (flavor "forever") and Retail/Midnight
+      # ("mainline"); the flavors come from the .toc's Interface list.
+      - name: Write release.json
+        run: |
+          interfaces=$(grep -m1 '^## Interface:' LootTracker/LootTracker.toc | tr -d '\r' | sed 's/^## Interface://; s/,/ /g')
+          forever=0; mainline=0
+          for n in $interfaces; do
+            if [ "$n" -ge 16000 ] && [ "$n" -lt 17000 ] && [ "$n" -gt "$forever" ]; then forever=$n; fi
+            if [ "$n" -ge 100000 ] && [ "$n" -gt "$mainline" ]; then mainline=$n; fi
+          done
+          [ "$forever" -gt 0 ] && [ "$mainline" -gt 0 ] \
+            || { echo "The .toc's Interface list needs a Forever (16xxx) and a Retail (1xxxxx) version"; exit 1; }
+          cat > dist/release.json <<JSON
+          {
+            "releases": [
+              {
+                "name": "LootTracker",
+                "version": "${TAG}",
+                "filename": "LootTracker-${TAG}.zip",
+                "nolib": false,
+                "metadata": [
+                  { "flavor": "forever", "interface": ${forever} },
+                  { "flavor": "mainline", "interface": ${mainline} }
+                ]
+              }
+            ]
+          }
+          JSON
+          python3 -m json.tool dist/release.json
+
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           # On a manual run the tag does not exist yet; --target creates it here.
-          gh release create "$TAG" "dist/LootTracker-${TAG}.zip" \
+          gh release create "$TAG" "dist/LootTracker-${TAG}.zip" dist/release.json \
             --target "$GITHUB_SHA" \
             --title "Loot Tracker ${TAG}" \
-            --notes "Loot Tracker for WoW: Forever (## Interface: 16001). Standalone: needs no other addon.
+            --notes "Loot Tracker for WoW: Forever and Midnight (Retail). Standalone: needs no other addon. Addon managers that read release.json (WoWDeck, WowUp) offer it for both.
 
-          Unzip into World of Warcraft\\_classic_beta_\\Interface\\AddOns\\ so you have AddOns\\LootTracker\\LootTracker.toc, then restart the client. It stays off while CRPGui's or Pillars UI's Loot Tracker module is on.
+          Unzip into World of Warcraft\\_forever_\\Interface\\AddOns\\ (Forever; _classic_beta_ for Forever Beta) or World of Warcraft\\_retail_\\Interface\\AddOns\\ (Midnight) so you have AddOns\\LootTracker\\LootTracker.toc, then restart the client. It stays off while CRPGui's or Pillars UI's Loot Tracker module is on.
+
+          2.2.1: WoW Midnight in the .toc's Interface list, and a release.json so WoWDeck and WowUp find this release for WoW Forever and Midnight.
 
           2.2.0: a Style for the window: Loot History (the window as it was), Quest Tracker (the game's quest tracker look: titles and objectives, no panel), RuneLite (RuneLite's Loot Tracker: gray boxes with item grids) or FlareUI (a dark panel in a bronze frame, ringed icons). In the settings, the arrow's menu, or /lt style."

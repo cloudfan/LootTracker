@@ -1,6 +1,6 @@
 # Loot Tracker
 
-What you loot and from what, for World of Warcraft: Forever (`## Interface: 16001`). Standalone: needs no other addon. It is the standalone version of CRPGui's Loot Tracker module (in [Pillars UI](https://github.com/cloudfan/PillarsUI)); with that module, or Pillars UI's own, turned on, this addon stays off (use one of the two).
+What you loot and from what, for World of Warcraft: Forever (`## Interface: 16001`) and Midnight (Retail, 12.1: `120100`, `120105`, `120107`). Standalone: needs no other addon. It is the standalone version of CRPGui's Loot Tracker module (in [Pillars UI](https://github.com/cloudfan/PillarsUI)); with that module, or Pillars UI's own, turned on, this addon stays off (use one of the two).
 
 - **Sources:** creatures (each looted corpse a kill, grouped by creature or listed one by one), their skinning and pickpocketing (their own entries, or in the creature's), chests, lockboxes, resource nodes (Copper Veins together, Peaceblooms together; each gathering of a node counts, so an ore vein's several loots all do) and fishing (by zone, or schools by type). No combat log: the loot window says where each item and coin came from.
 - **Value:** gold beside each source's name, with its items' vendor value, or their auction value from a scan of your realm's auction house (once every 15 minutes, at the auction house).
@@ -64,4 +64,6 @@ Options > AddOns > Loot Tracker, or `/lt`.
 
 ## Install
 
-Copy the `LootTracker` folder (the one holding `LootTracker.toc`) into `World of Warcraft\_classic_beta_\Interface\AddOns\` and restart the client.
+With an addon manager: in WoWDeck (or WowUp), install from GitHub with `cloudfan/LootTracker`. Each release carries a `release.json` naming its zip for WoW Forever (flavor `forever`) and Midnight (flavor `mainline`), so both find it and keep it updated.
+
+By hand: copy the `LootTracker` folder (the one holding `LootTracker.toc`) into `World of Warcraft\_forever_\Interface\AddOns\` (Forever; `_classic_beta_` for Forever Beta) or `World of Warcraft\_retail_\Interface\AddOns\` (Midnight) and restart the client.
