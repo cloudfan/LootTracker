@@ -37,6 +37,7 @@ local DEFAULTS = {
 	fontSize = 0,                -- 0: the tracker's own sizes; else the lines' size, the rest in step
 	fontShadow = "global",
 	-- The window
+	style = "blizzard",          -- "blizzard" (Loot History), "quest" (Quest Tracker), "runelite" (RuneLite) or "flare" (FlareUI)
 	view = "list",               -- "list" or "icons"
 	listIcons = true,            -- List view: each item's icon before its name
 	iconSize = 24,               -- Icons view: the icons' size

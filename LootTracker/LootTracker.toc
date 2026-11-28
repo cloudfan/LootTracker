@@ -17,4 +17,8 @@ Tracking.lua
 Auction.lua
 Data.lua
 Window.lua
+Styles.lua
+StyleQuest.lua
+StyleRuneLite.lua
+StyleFlare.lua
 Settings.lua

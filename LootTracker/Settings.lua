@@ -338,6 +338,8 @@ end, "The window back to its place on the right of the screen.")
 EndRow()
 
 Header("View")
+Dropdown(1, "Style", "style", Items(ns.STYLES), "The window's look: Loot History (the game's group loot history window), Quest Tracker (the quest tracker's titles and objectives, no panel), RuneLite (RuneLite's Loot Tracker: gray boxes with item grids) or FlareUI (a dark panel in a bronze frame, ringed icons). The arrow's menu and a right-click on the other styles' title bars have it too.")
+EndRow()
 Dropdown(1, "View", "view", Items({
 	{ value = "list", label = "List" },
 	{ value = "icons", label = "Icons" },
@@ -477,6 +479,15 @@ SlashCmdList.LOOTTRACKER = function(msg)
 	elseif command == "show" or command == "hide" or command == "toggle" then
 		local collapsed = command == "hide" or (command == "toggle" and not Get("collapsed"))
 		Set("collapsed", collapsed)
+	elseif command:match("^style") then
+		local wanted = command:match("^style%s+(%S+)")
+		for _, choice in ipairs(ns.STYLES) do
+			if wanted == choice.value or wanted == choice.label:lower():gsub(" ", "") then
+				Set("style", choice.value)
+				return
+			end
+		end
+		API.Print("/lt style blizzard, quest, runelite or flare.")
 	elseif command == "export" then
 		ns.Export()
 	elseif command == "scan" then

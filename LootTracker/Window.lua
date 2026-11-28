@@ -381,6 +381,10 @@ local function Menu(owner)
 			ns.SetScope("instance")
 		end)
 		root:CreateDivider()
+		local style = root:CreateButton("Style")
+		for _, choice in ipairs(ns.STYLES or {}) do
+			Radio(style, choice.label, "style", choice.value)
+		end
 		local view = root:CreateButton("View")
 		Radio(view, "List", "view", "list")
 		Radio(view, "Icons", "view", "icons")
@@ -403,6 +407,14 @@ local function Menu(owner)
 		end, function()
 			API.Set(S, "portraits", not Setting("portraits"))
 		end)
+		root:CreateCheckbox("Lock the Window", function()
+			return Locked()
+		end, function()
+			API.Set(S, "locked", not Locked())
+		end)
+		root:CreateButton("Hide the Window", function()
+			API.Set(S, "collapsed", true)
+		end)
 		root:CreateDivider()
 		root:CreateButton("Scan the Auction House", function()
 			ns.Scan()
@@ -421,6 +433,9 @@ local function Menu(owner)
 		end)
 	end)
 end
+
+-- The other styles open the same menu.
+ns.ShowMenu = Menu
 
 -- Its place: the top left corner from the screen's bottom left.
 local function SavePlace()
@@ -606,7 +621,9 @@ local function Apply()
 	end
 	frame:SetSize(tonumber(Setting("width")) or 300, tonumber(Setting("height")) or 420)
 	Place()
-	frame:SetShown(not Setting("collapsed"))
+	-- Another style (Styles.lua) shows its own frame instead.
+	local style = ns.CurrentStyle and ns.CurrentStyle() or "blizzard"
+	frame:SetShown(not Setting("collapsed") and style == "blizzard")
 	PaintLock()
 	Render()
 end
