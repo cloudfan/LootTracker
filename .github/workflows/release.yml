@@ -51,4 +51,4 @@ jobs:
 
           Unzip into World of Warcraft\\_classic_beta_\\Interface\\AddOns\\ so you have AddOns\\LootTracker\\LootTracker.toc, then restart the client. It stays off while CRPGui's or Pillars UI's Loot Tracker module is on.
 
-          2.1.0: the window from CRPGui (Blizzard's loot history look, a lock and a settings menu in its title bar, portraits, fold and forget per source), the Icons view and font settings, and every gathering of a node counted."
+          2.2.0: a Style for the window: Loot History (the window as it was), Quest Tracker (the game's quest tracker look: titles and objectives, no panel), RuneLite (RuneLite's Loot Tracker: gray boxes with item grids) or FlareUI (a dark panel in a bronze frame, ringed icons). In the settings, the arrow's menu, or /lt style."
