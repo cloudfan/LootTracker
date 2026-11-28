@@ -83,6 +83,8 @@ jobs:
 
           Unzip into World of Warcraft\\_forever_\\Interface\\AddOns\\ (Forever; _classic_beta_ for Forever Beta) or World of Warcraft\\_retail_\\Interface\\AddOns\\ (Midnight) so you have AddOns\\LootTracker\\LootTracker.toc, then restart the client. It stays off while CRPGui's or Pillars UI's Loot Tracker module is on.
 
+          2.2.2: the FlareUI style rebuilt as FlareUI's own quest tracker window, with FlareUI's frame border and portrait ring (its art, MIT License, credited in the README).
+
           2.2.1: WoW Midnight in the .toc's Interface list, and a release.json so WoWDeck and WowUp find this release for WoW Forever and Midnight.
 
           2.2.0: a Style for the window: Loot History (the window as it was), Quest Tracker (the game's quest tracker look: titles and objectives, no panel), RuneLite (RuneLite's Loot Tracker: gray boxes with item grids) or FlareUI (a dark panel in a bronze frame, ringed icons). In the settings, the arrow's menu, or /lt style."
