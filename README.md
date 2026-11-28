@@ -10,7 +10,7 @@ What you loot and from what, for World of Warcraft: Forever (`## Interface: 1600
   - **Loot History** (the default): the window above.
   - **Quest Tracker:** in the look of the game's quest tracker: no panel, a "Loot" header with the total and a minimize button, each source as a quest title (its kill count in brackets) with its loot under it as objectives ("- 4 Linen Cloth"), titles gold and brighter while hovered.
   - **RuneLite:** in the look of RuneLite's Loot Tracker: flat grays, a row of small controls (collapse or expand all, By Source, Each Loot, the menu), an overall box (total count, total value), then a box per source: its title bar (name, "x 13", value) over a grid of five slots a row, counts in yellow (white from 100K, green from 10M), money as a slot of coins.
-  - **FlareUI:** in the look of the FlareUI suite's quest panel: a near-black panel in one thin bronze line with softly rounded corners, a title bar (the number of sources, the scope as a word you click through, a minimize box, the menu arrow), each source's icon in a bronze portrait ring, its count in orange brackets, a footer with the total.
+  - **FlareUI:** built as FlareUI's quest tracker window, with FlareUI's own frame border and portrait ring: a dark panel in a thin bronze border with rounded corners, a header (the number of sources, the scope as a word you click through, a minimize box, the menu arrow), each source's icon in FlareUI's bronze ring, its count in orange brackets, a footer with the total.
   In the three new styles a click on a source folds it, a right-click forgets it, and a right-click on the title bar (or header, or the controls' row) opens the menu; they share the Loot History window's place, size and lock.
 - **Names:** creatures and world objects are named by ID, account-wide, even when the game hides names in an instance; hovering a source shows its NPC, object or item ID.
 - **Per entry:** a click on a source folds its loot; its X deletes it.
@@ -67,3 +67,7 @@ Options > AddOns > Loot Tracker, or `/lt`.
 With an addon manager: in WoWDeck (or WowUp), install from GitHub with `cloudfan/LootTracker`. Each release carries a `release.json` naming its zip for WoW Forever (flavor `forever`) and Midnight (flavor `mainline`), so both find it and keep it updated.
 
 By hand: copy the `LootTracker` folder (the one holding `LootTracker.toc`) into `World of Warcraft\_forever_\Interface\AddOns\` (Forever; `_classic_beta_` for Forever Beta) or `World of Warcraft\_retail_\Interface\AddOns\` (Midnight) and restart the client.
+
+## Credits
+
+The FlareUI style uses two pieces of [FlareUI](https://github.com/malkkav/FlareUI)'s art by Malkkav, under its MIT License: its frame border and its portrait ring (`LootTracker/Media/FlareUI-Frames.tga`, `FlareUI-Ring.tga`; the license is in `LootTracker/Media/FlareUI-LICENSE.txt`).

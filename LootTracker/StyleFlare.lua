@@ -1,34 +1,40 @@
 local addonName, ns = ...
 local API = ns.API
 
--- Style "flare": in the look of the FlareUI suite's quest panel: a
--- near-black panel in one thin muted-bronze line with softly rounded corners
--- (the game's tooltip border, tinted); a title bar ("Loot" in gold, the
--- number of sources in gray, the scope as a word you click through, a
--- minimize box, the menu arrow) over a thin brown rule; each source with its icon in
--- a bronze portrait ring (Media\PortraitRing.tga), its count in orange
--- brackets and its name in old gold; its items in their quality's colors
+-- Style "flare": built as FlareUI's quest tracker window is
+-- (malkkav/FlareUI, Modules/ObjectiveTracker.lua), with its art (MIT, see
+-- Media/FlareUI-LICENSE.txt): the dark dialog background at 75% in FlareUI's
+-- frame border (Media/FlareUI-Frames.tga, a 16 px edge, tinted its bronze
+-- #A67D45); a 30 px header ("Loot" in light bronze, the number of sources,
+-- the scope as a word you click through, a 14 px bronze minimize box, the
+-- menu arrow) over the game's tooltip divider; each source with its icon in
+-- FlareUI's bronze ring (Media/FlareUI-Ring.tga), its count in soft orange
+-- brackets and its name in FlareUI's title bronze; its items in their quality's colors
 -- with bronze-edged icons (or a grid of them, Icons view); the total in a
 -- footer. A click on a source folds it; a right-click forgets it.
 
 local Setting = ns.Setting
 local MEDIA = [[Interface\AddOns\]] .. addonName .. [[\Media\]]
 
--- Sampled from FlareUI's quest panel: its ground, its border line, the rule
--- under its title, its gold titles, tan zone names, orange-brown level
--- brackets, cream objectives and gray-tan count.
-local BACK = { 0.016, 0.008, 0, 0.94 }
-local EDGE = { 0.45, 0.35, 0.21 }
-local RULE = { 0.22, 0.16, 0.09 }
-local OUTER = { 0.33, 0.25, 0.14 }
-local INNER = { 0.49, 0.37, 0.22 }
-local GOLD = { 0.97, 0.82, 0.28 }
-local SECTION = { 0.83, 0.70, 0.41 }
-local ACCENT = { 0.80, 0.47, 0.18 }
-local TEXT = { 0.91, 0.84, 0.69 }
-local DIM = { 0.63, 0.56, 0.44 }
+-- FlareUI's palette (Core.lua's ns.PALETTE) as its quest tracker uses it:
+-- the frame border bronze3, buttons bronze2 (bronze3 while pointed at), the
+-- scroll bar bronze1, the heading bronze5, quest titles bronze4; its
+-- objective, dim and orange in its softer tones (ns.SoftColor).
+local BACKGROUND = [[Interface\DialogFrame\UI-DialogBox-Background-Dark]]
+local OPACITY = 0.75
+local EDGE = { 0.65, 0.49, 0.27 }       -- bronze3: every border
+local OUTER = { 0.50, 0.38, 0.21 }      -- bronze2: buttons, icon edges, dividers
+local INNER = { 0.65, 0.49, 0.27 }      -- bronze3: the same, pointed at
+local SCROLL = { 0.32, 0.24, 0.13 }     -- bronze1: the scroll bar
+local GOLD = { 0.85, 0.68, 0.47 }       -- bronze5: the heading, values
+local SECTION = { 0.80, 0.60, 0.34 }    -- bronze4: titles
+local ACCENT = { 0.85, 0.57, 0.40 }     -- orange, softened
+local TEXT = { 0.85, 0.81, 0.76 }       -- the objective gray, softened
+local DIM = { 0.63, 0.59, 0.54 }        -- the dim gray, softened
 
-local TITLE_HEIGHT, FOOTER_HEIGHT, HEAD, ROW = 26, 22, 26, 18
+-- FlareUI's header: 30 px, its contents 8 px in, the divider 2 px above its foot.
+local HEADER, HEADER_INSET = 30, 8
+local TITLE_HEIGHT, FOOTER_HEIGHT, HEAD, ROW = HEADER - 3, 22, 26, 18
 
 local heads, lines, icons
 
@@ -40,22 +46,25 @@ local function Hex(color)
 	return ("|cff%02x%02x%02x"):format(color[1] * 255, color[2] * 255, color[3] * 255)
 end
 
--- A thin brown rule along a frame's top or bottom edge, a little in from
--- its sides (the line under the quest panel's title).
-local function Rule(parent, edge)
-	local line = ns.Fill(parent, "ARTWORK", RULE[1], RULE[2], RULE[3], 1)
-	line:SetHeight(1)
-	line:SetPoint(edge .. "LEFT", parent, edge .. "LEFT", 4, 0)
-	line:SetPoint(edge .. "RIGHT", parent, edge .. "RIGHT", -4, 0)
+-- The game's tooltip divider (the line under FlareUI's tracker header), along
+-- a frame's top or bottom edge.
+local function Rule(parent, edge, y)
+	local line = parent:CreateTexture(nil, "ARTWORK")
+	line:SetTexture([[Interface\Common\UI-TooltipDivider-Transparent]])
+	line:SetHeight(8)
+	line:SetPoint("LEFT", parent, edge .. "LEFT", 0, y or 0)
+	line:SetPoint("RIGHT", parent, edge .. "RIGHT", 0, y or 0)
 end
 
--- An icon in a round bronze ring.
+-- An icon in FlareUI's bronze ring. The ring fills the middle of its
+-- texture (pixels 62 to 193 of 256, a 16 px band): only that is drawn.
+local RING_CROP = { 60 / 256, 196 / 256 }
 local function Ring(parent, size)
 	local holder = CreateFrame("Frame", nil, parent)
 	holder:SetSize(size, size)
 	holder.icon = holder:CreateTexture(nil, "ARTWORK")
-	holder.icon:SetPoint("TOPLEFT", size * 0.08, -size * 0.08)
-	holder.icon:SetPoint("BOTTOMRIGHT", -size * 0.08, size * 0.08)
+	holder.icon:SetPoint("TOPLEFT", size * 0.11, -size * 0.11)
+	holder.icon:SetPoint("BOTTOMRIGHT", -size * 0.11, size * 0.11)
 	holder.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 	pcall(function()
 		local mask = holder:CreateMaskTexture()
@@ -65,7 +74,8 @@ local function Ring(parent, size)
 	end)
 	holder.ring = holder:CreateTexture(nil, "OVERLAY")
 	holder.ring:SetAllPoints()
-	holder.ring:SetTexture(MEDIA .. "PortraitRing")
+	holder.ring:SetTexture(MEDIA .. "FlareUI-Ring")
+	holder.ring:SetTexCoord(RING_CROP[1], RING_CROP[2], RING_CROP[1], RING_CROP[2])
 	return holder
 end
 
@@ -173,38 +183,40 @@ local SCOPES = { all = "All", session = "Session", instance = "Instance" }
 local NEXT_SCOPE = { all = "session", session = "instance", instance = "all" }
 
 local function Build()
-	local frame = ns.NewStyleFrame("flare", 2)
-	ns.PaintScrollBar(frame.bar, 0, 0, 0, 0, INNER[1], INNER[2], INNER[3], 1)
+	local frame = ns.NewStyleFrame("flare", 3)
+	ns.PaintScrollBar(frame.bar, 0, 0, 0, 0, SCROLL[1], SCROLL[2], SCROLL[3], 1)
 	frame:EnableMouse(true)
 
-	-- The panel: near black in one thin bronze line with rounded corners
-	-- (the tooltip border, tinted); without backdrops, a square line.
+	-- The panel: FlareUI's tracker backdrop (the dark dialog background at
+	-- 75%, FlareUI's frame border in its bronze); without backdrops, a dark
+	-- fill in a square bronze line.
 	local panel = CreateFrame("Frame", nil, frame, BackdropTemplateMixin and "BackdropTemplate" or nil)
 	panel:SetAllPoints()
 	panel:SetFrameLevel(frame:GetFrameLevel())
 	if panel.SetBackdrop then
 		panel:SetBackdrop({
-			bgFile = [[Interface\Buttons\WHITE8X8]],
-			edgeFile = [[Interface\Tooltips\UI-Tooltip-Border]],
-			edgeSize = 12,
+			bgFile = BACKGROUND,
+			edgeFile = MEDIA .. "FlareUI-Frames",
+			tile = false, tileSize = 0,
+			edgeSize = 16,
 			insets = { left = 3, right = 3, top = 3, bottom = 3 },
 		})
-		panel:SetBackdropColor(BACK[1], BACK[2], BACK[3], BACK[4])
+		panel:SetBackdropColor(1, 1, 1, OPACITY)
 		panel:SetBackdropBorderColor(EDGE[1], EDGE[2], EDGE[3], 1)
 	else
-		local back = ns.Fill(panel, "BACKGROUND", BACK[1], BACK[2], BACK[3], BACK[4])
+		local back = ns.Fill(panel, "BACKGROUND", 0.05, 0.04, 0.03, OPACITY)
 		back:SetAllPoints()
 		ns.Outline(panel, EDGE[1], EDGE[2], EDGE[3], 1, 1, "BORDER")
 	end
 
 	-- The title bar.
 	local title = CreateFrame("Frame", nil, frame)
-	title:SetPoint("TOPLEFT", 4, -4)
-	title:SetPoint("TOPRIGHT", -4, -4)
+	title:SetPoint("TOPLEFT", HEADER_INSET, -3)
+	title:SetPoint("TOPRIGHT", -HEADER_INSET, -3)
 	title:SetHeight(TITLE_HEIGHT)
-	Rule(title, "BOTTOM")
+	Rule(title, "BOTTOM", -2)
 	title.text = title:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-	title.text:SetPoint("LEFT", 8, 0)
+	title.text:SetPoint("LEFT", 0, 0)
 	title.count = title:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 	title.count:SetPoint("LEFT", title.text, "RIGHT", 6, 0)
 	ns.DragHandle(frame, title)
@@ -213,7 +225,7 @@ local function Build()
 	-- The menu: the arrow, in gold.
 	local arrow = CreateFrame("Button", nil, title)
 	arrow:SetSize(16, 16)
-	arrow:SetPoint("RIGHT", -4, 0)
+	arrow:SetPoint("RIGHT", 2, 0)
 	arrow:SetNormalTexture([[Interface\ChatFrame\ChatFrameExpandArrow]])
 	local art = arrow:GetNormalTexture()
 	if art then
@@ -230,22 +242,24 @@ local function Build()
 	end)
 	Tip(arrow, "Loot Tracker Settings", "Scope, view, grouping, values, sorting, style, export, reset.")
 
-	-- Minimize: a small bronze box with a dash (a cross while minimized),
-	-- in the panel's quiet tan.
+	-- Minimize: FlareUI's 14 px box, a 2 px dash (a plus while minimized),
+	-- all in bronze2, bronze3 while pointed at.
 	local minimize = CreateFrame("Button", nil, title)
-	minimize:SetSize(12, 12)
+	minimize:SetSize(14, 14)
 	minimize:SetPoint("RIGHT", arrow, "LEFT", -6, 0)
-	minimize.box = ns.Outline(minimize, INNER[1], INNER[2], INNER[3], 1, 0, "ARTWORK")
-	minimize.dash = ns.Fill(minimize, "ARTWORK", DIM[1], DIM[2], DIM[3], 1)
-	minimize.dash:SetSize(6, 1)
+	minimize.box = ns.Outline(minimize, OUTER[1], OUTER[2], OUTER[3], 1, 0, "ARTWORK")
+	minimize.dash = ns.Fill(minimize, "ARTWORK", OUTER[1], OUTER[2], OUTER[3], 1)
+	minimize.dash:SetSize(8, 2)
 	minimize.dash:SetPoint("CENTER")
-	minimize.stem = ns.Fill(minimize, "ARTWORK", DIM[1], DIM[2], DIM[3], 1)
-	minimize.stem:SetSize(1, 6)
+	minimize.stem = ns.Fill(minimize, "ARTWORK", OUTER[1], OUTER[2], OUTER[3], 1)
+	minimize.stem:SetSize(2, 8)
 	minimize.stem:SetPoint("CENTER")
 	minimize:SetScript("OnClick", ns.ToggleMinimized)
 	function minimize:Hover(inside)
-		local color = inside and SECTION or INNER
-		self.box:SetColor(color[1], color[2], color[3], 1)
+		local c = inside and INNER or OUTER
+		self.box:SetColor(c[1], c[2], c[3], 1)
+		self.dash:SetColorTexture(c[1], c[2], c[3], 1)
+		self.stem:SetColorTexture(c[1], c[2], c[3], 1)
 	end
 	Tip(minimize, function()
 		return ns.Minimized() and "Expand" or "Minimize"
@@ -269,21 +283,22 @@ local function Build()
 
 	-- The footer: a rule, the total.
 	local footer = CreateFrame("Frame", nil, frame)
-	footer:SetPoint("BOTTOMLEFT", 4, 4)
-	footer:SetPoint("BOTTOMRIGHT", -4, 4)
+	footer:SetPoint("BOTTOMLEFT", HEADER_INSET, 4)
+	footer:SetPoint("BOTTOMRIGHT", -HEADER_INSET, 4)
 	footer:SetHeight(FOOTER_HEIGHT)
 	Rule(footer, "TOP")
 	footer.label = footer:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
-	footer.label:SetPoint("LEFT", 8, 0)
+	footer.label:SetPoint("LEFT", 0, 0)
 	footer.label:SetText("Total")
 	footer.value = footer:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-	footer.value:SetPoint("RIGHT", -18, 0)
+	footer.value:SetPoint("RIGHT", -12, 0)
 	frame.footer = footer
 
-	frame.scroll:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 2, -4)
-	frame.scroll:SetPoint("BOTTOMRIGHT", footer, "TOPRIGHT", -10, 2)
-	frame.bar:SetPoint("TOPRIGHT", title, "BOTTOMRIGHT", -2, -4)
-	frame.bar:SetPoint("BOTTOMRIGHT", footer, "TOPRIGHT", -2, 2)
+	-- The list 10 px under the header; the scroll bar 6 px in from the right.
+	frame.scroll:SetPoint("TOPLEFT", frame, "TOPLEFT", HEADER_INSET, -(HEADER + 10))
+	frame.scroll:SetPoint("BOTTOMRIGHT", footer, "TOPRIGHT", -6, 4)
+	frame.bar:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -6, -(HEADER + 10))
+	frame.bar:SetPoint("BOTTOMRIGHT", footer, "TOPRIGHT", HEADER_INSET - 6, 4)
 
 	frame.empty = frame.content:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
 	frame.empty:SetPoint("TOP", 0, -14)
@@ -309,7 +324,7 @@ end
 local function Refresh(frame)
 	local minimized = ns.Minimized()
 	if minimized then
-		frame:SetHeight(TITLE_HEIGHT + 8)
+		frame:SetHeight(HEADER + 3)
 	end
 	frame.footer:SetShown(not minimized)
 	frame.grip:SetShown(not minimized and not ns.Locked())
